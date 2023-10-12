@@ -101,6 +101,118 @@ public class TCPServer {
 
 以上代码示例中，客户端通过创建一个`Socket`对象与服务器建立连接，然后通过`OutputStream`发送数据，并通过`InputStream`接收服务器的响应。服务器端通过创建一个`ServerSocket`对象监听指定端口，接收来自客户端的连接，然后通过`InputStream`接收客户端的数据，并通过`OutputStream`发送响应。
 
+还可以这样
+服务端
+```java
+package com.itest.socket2;
+
+import java.io.*;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+
+public class TCPEchoServer {
+    public static void main(String[] args) throws IOException {
+        ServerSocket serverSocket = new ServerSocket(12900, 100, InetAddress.getByName("localhost"));
+        System.out.println("Server started at: " + serverSocket);
+
+        while (true) {
+            System.out.printf("Waiting for a connection...");
+
+            final Socket activeSocket = serverSocket.accept();
+
+            System.out.println("Received a connection from " + activeSocket);
+
+            Runnable runnable = () -> handleClientRequest(activeSocket);
+            new Thread(runnable).start();
+        }
+    }
+
+    private static void handleClientRequest(Socket activeSocket) {
+        BufferedReader bufferedReader = null;
+        BufferedWriter bufferedWriter = null;
+        try {
+            bufferedReader = new BufferedReader(new InputStreamReader(activeSocket.getInputStream()));
+            bufferedWriter = new BufferedWriter(new OutputStreamWriter(activeSocket.getOutputStream()));
+
+            String inMsg = null;
+
+            while((inMsg = bufferedReader.readLine()) != null) {
+                System.out.println("Received from client: " + inMsg);
+
+                String outMsg = inMsg;
+                bufferedWriter.write("I received: " + outMsg + "\n");
+                bufferedWriter.flush();
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } finally {
+            try {
+                activeSocket.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+}
+
+```
+客户端
+```java
+package com.itest.socket2;
+
+import java.io.*;
+import java.net.Socket;
+import java.net.UnknownHostException;
+
+public class TCPEchoClient {
+    public static void main(String[] args) {
+        Socket socket = null;
+        BufferedReader bufferedReader = null;
+        BufferedWriter bufferedWriter = null;
+
+        try {
+            socket = new Socket("localhost", 12900);
+            System.out.println("Started client socket at " + socket.getLocalSocketAddress());
+
+            bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+
+            BufferedReader consoleReader = new BufferedReader((new InputStreamReader(System.in)));
+            String promptMsg = "Please enter a message (Bye to quit):";
+            String outMsg = null;
+
+            while ((outMsg = consoleReader.readLine()) != null) {
+                if (outMsg.equalsIgnoreCase("bye")) {
+                    break;
+                }
+                bufferedWriter.write(outMsg + "\n");
+                bufferedWriter.flush();
+
+                String inMsg = bufferedReader.readLine();
+                System.out.printf("Server: " + inMsg);
+
+                System.out.println();
+                System.out.printf(promptMsg);
+            }
+        } catch (UnknownHostException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } finally {
+            if (socket != null) {
+                try {
+                    socket.close();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+    }
+}
+
+```
+
 2. UDP解决方法：
 在Java中，使用UDP协议进行网络通信主要通过`DatagramSocket`和`DatagramPacket`类进行编程实现。以下是UDP的解决方法的示例代码：
 
