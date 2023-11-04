@@ -10,7 +10,7 @@ public class RandomNumberWriter {
         String filePath2 = "hw1.group2.dat";
         String filePath3 = "hw1.group3.dat";
         // 缓冲区大小 设置为1页
-        int bufferSize = 1024 * 4;
+        int bufferSize = 1024 * 8;
         // 记录组内数对个数
         int group1Size = 0;
         int group2Size = 0;
@@ -77,7 +77,7 @@ public class RandomNumberWriter {
                     group2Size++;
                 }
 
-                // 当缓冲区剩余空间不足16字节（每个随机数double占8字节）时，进行写入操作
+                // 当缓冲区剩余空间不足16字节（每个double占8字节）时，进行写入操作
                 if (buffer1.remaining() < 16) {
                     buffer1.flip();
                     // 写入文件
@@ -85,7 +85,7 @@ public class RandomNumberWriter {
                     // 清空缓冲区
                     buffer1.clear();
                 }
-                // 当缓冲区剩余空间不足16字节（每个随机数double占8字节）时，进行写入操作
+                // 当缓冲区剩余空间不足16字节（每个double占8字节）时，进行写入操作
                 if (buffer2.remaining() < 16) {
                     buffer2.flip();
                     // 写入文件
@@ -93,7 +93,7 @@ public class RandomNumberWriter {
                     // 清空缓冲区
                     buffer2.clear();
                 }
-                // 当缓冲区剩余空间不足16字节（每个随机数double占8字节）时，进行写入操作
+                // 当缓冲区剩余空间不足16字节（每个double占8字节）时，进行写入操作
                 if (buffer3.remaining() < 16) {
                     buffer3.flip();
                     // 写入文件
@@ -126,11 +126,11 @@ public class RandomNumberWriter {
                 buffer3.clear();
             }
 
-            // // 追加复制group2.dat到group1.dat
+            // 追加复制group2.dat到group1.dat
             fileChannel1.position(fileChannel1.size());
             fileChannel2.transferTo(0, fileChannel2.size(), fileChannel1);
 
-            // // 追加复制group3.dat到group1.dat
+            // 追加复制group3.dat到group1.dat
             fileChannel1.position(fileChannel1.size());
             fileChannel3.transferTo(0, fileChannel3.size(), fileChannel1);
 

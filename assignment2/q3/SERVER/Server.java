@@ -1,7 +1,6 @@
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.file.Paths;
@@ -14,6 +13,7 @@ public class Server {
     public static void main(String[] args) {
         int SERVER_PORT = 8888;
         try (ServerSocketChannel serverSocketChannel = ServerSocketChannel.open()) {
+            // 绑定端口
             serverSocketChannel.bind(new InetSocketAddress(SERVER_PORT));
             System.out.println("服务器已启动，等待客户端连接...");
 
@@ -30,8 +30,6 @@ public class Server {
     private static void handleClient(SocketChannel socketChannel) {
         try {
             while (true) {
-
-            
                 // 接收文件名长度
                 ByteBuffer fileNameLengthBuffer = ByteBuffer.allocate(Integer.BYTES);
                 if (socketChannel.read(fileNameLengthBuffer) < 0) {
@@ -60,18 +58,24 @@ public class Server {
 
                 // 接收文件内容
                 try (FileChannel fileChannel = FileChannel.open(Paths.get(fileName), StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
-
+                    // 已经读取的字节数
                     long fileBytesRead = 0;
                     ByteBuffer fileBuffer = ByteBuffer.allocate(BUFFER_SIZE);
+                    // 直到读完文件内容停止 分批次读取写入
                     while (fileBytesRead < fileLength) {
+                        // 还未读取的字节数
                         long remaining = fileLength - fileBytesRead;
+                        // 取剩下未读取的字节和BUFFER_SIZE中最小的
                         int toReadSize = (int) Math.min(remaining, BUFFER_SIZE);
+                        // 限制缓冲区大小
                         fileBuffer.limit(toReadSize);
+                        // 读取socket
                         int fileBytesReadNow = socketChannel.read(fileBuffer);
                         if (fileBytesReadNow == -1) {
                             break;
                         }
                         fileBuffer.flip();
+                        // 写入文件
                         fileChannel.write(fileBuffer);
                         fileBytesRead += fileBytesReadNow;
                         fileBuffer.clear();
