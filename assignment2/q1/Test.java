@@ -1,138 +1,88 @@
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.*;
 
 public class Test {
     public static final int BUFFER_SIZE = 0x4000;
-    public static byte[] outBuffer = new byte[BUFFER_SIZE];
     public static byte[] inBuffer = new byte[BUFFER_SIZE];
-    public static int outPointer = 0;
     public static int inPointer = 0;
-    public static RandomAccessFile in;
-    public static FileOutputStream out;
+    public static BufferedInputStream inB;
+    public static RandomAccessFile inR;
+    public static BufferedWriter out;
     public static int[] groupCount = new int[3];
     public static int[] groupPassCount = new int[4];
     public static int[] groupStart = new int[3];
     public static double[] groupFirst = new double[3];
-    public static final String inFilePath = "h2q1.dat";
-    public static final String outFilePath = "output.txt";
+    public static final String inFilePath = "./q1/data.dat";
+    public static final String outFilePath = "./q1/test.txt";
+    public enum NumKind { err, low, mid, high }
 
-    public static int outBufferStore(final int value) {
-        final byte[] bytes = String.valueOf(value).getBytes();
-
-        try {
-            if (bytes.length + 1 > BUFFER_SIZE - outPointer) {
-                out.write(outBuffer, 0, outPointer);
-                outPointer = 0;
-            }
-
-            for (byte b: bytes) {
-                outBuffer[outPointer++] = b;
-            }
-            outBuffer[outPointer++] = '\n';
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return value;
-    }
-
-    public static double outBufferStore(final double value) {
-        final byte[] bytes = String.valueOf(value).getBytes();
-
-        try {
-            if (bytes.length > BUFFER_SIZE - outPointer) {
-                out.write(outBuffer, 0, outPointer);
-                outPointer = 0;
-            }
-
-            for (byte b: bytes) {
-                outBuffer[outPointer++] = b;
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return value;
-    }
-
-    public static void outBufferStore(final double value1, final double value2) {
-        final byte[] bytes1 = String.valueOf(value1).getBytes();
-        final byte[] bytes2 = String.valueOf(value2).getBytes();
-
-        try {
-            if (bytes1.length + bytes2.length + 3 > BUFFER_SIZE - outPointer) {
-                out.write(outBuffer, 0, outPointer);
-                outPointer = 0;
-            }
-
-            for (byte b : bytes1) {
-                outBuffer[outPointer++] = b;
-            }
-            outBuffer[outPointer++] = (byte) ',';
-            outBuffer[outPointer++] = (byte) ' ';
-            for (byte b: bytes2) {
-                outBuffer[outPointer++] = b;
-            }
-            outBuffer[outPointer++] = (byte) '\n';
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public static void outBufferStore(String text) {
-        final byte[] bytes = text.getBytes();
-
-        try {
-            if (bytes.length > BUFFER_SIZE - outPointer) {
-                out.write(outBuffer, 0, outPointer);
-                outPointer = 0;
-            }
-
-            for (byte b: bytes) {
-                outBuffer[outPointer++] = b;
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public static void flushOutBuffer() {
-        try {
-            out.write(outBuffer, 0, outPointer);
-            outPointer = 0;
-        } catch (IOException e) {
-            System.out.println("缓冲区清空时发生错误");
-        }
+    public static String formatSize(final long size) {
+        if (size >= 0 &&size < 0x400)
+            return size + "B";
+        else if (size < 0x100000)
+            return String.format("%.2f", ((double) size / 0x400)) + "KB";
+        else if (size < 0x40000000)
+            return String.format("%.2f", ((double) size / 0x100000)) + "MB";
+        else
+            return String.format("%.2f", ((double) size / 0x40000000)) + "GB";
     }
 
     public static double bytesToDouble(byte[] bytes) {
-        if (bytes.length != 8)
-            return 0.0;
-
         long middle = 0;
 
-        for (int i = 0; i < 8; i++) {
-            middle = (middle << 8) | (bytes[i] & 0xFF);
+        for (byte b: bytes) {
+            middle = (middle << 8) | (b & 0xFF);
         }
 
         return Double.longBitsToDouble(middle);
     }
 
+    public static int bytesToInteger(int bytesRead, byte[] bytes) {
+        if (bytesRead != 4)
+            return -1;
+
+        int ret = 0;
+
+        for (byte b: bytes) {
+            ret = (ret << 8) | (b & 0xFF);
+        }
+
+        return ret;
+    }
+
     public static int checkPairGroup(final double num1, final double num2) {
-        if (num1 < 0 || num1 > 1 || num2 < 0 || num2 > 1)
+        NumKind kind1, kind2;
+
+        if (num1 >= 0 && num1 < 0.46)
+            kind1 = NumKind.low;
+        else if (num1 >= 0.46 && num1 <= 0.72)
+            kind1 = NumKind.mid;
+        else if (num1 > 0.72 && num1 <= 1)
+            kind1 = NumKind.high;
+        else
+            kind1 = NumKind.err;
+
+        if (num2 >= 0 && num2 < 0.46)
+            kind2 = NumKind.low;
+        else if (num2 >= 0.46 && num2 <= 0.72)
+            kind2 = NumKind.mid;
+        else if (num2 > 0.72 && num2 <= 1)
+            kind2 = NumKind.high;
+        else
+            kind2 = NumKind.err;
+
+        if (kind1 == NumKind.err || kind2 == NumKind.err)
             return 0;
-        else if (num1 >= 0 && num1 < 0.46 && num2 >= 0 && num2 < 0.46)
+        else if (kind1 == NumKind.low && kind2 == NumKind.low)
             return 1;
-        else if (num1 > 0.72 && num2 > 0.72)
+        else if (kind1 == NumKind.high && kind2 == NumKind.high)
             return 3;
         else
             return 2;
     }
 
-    public static void inBufferStore(final int groupNum) {
+    public static void checkGroup(final int groupNum) {
         try {
-            outBufferStore("\n********************************************Group" + (groupNum + 1) + "********************************************\n\n");
+            out.write("\n********************************************Group" + (groupNum + 1) + "********************************************\n\n");
             final int maxRead = groupCount[groupNum] * 2 * Double.BYTES;
             int remainRead = maxRead;
             byte[] bytesNum1 = new byte[8];
@@ -140,16 +90,14 @@ public class Test {
 
             while (remainRead != 0) {
                 final int readLen = Math.min(remainRead, BUFFER_SIZE);  //在该组区域内尝试读BUFFER_SIZE个字节
-                in.read(inBuffer, 0, readLen);
+                final int bytesRead = inB.read(inBuffer, 0, readLen);
                 inPointer = 0;
 
                 for (int i = 0; i < readLen / Double.BYTES / 2; i++) {  //计算出本次读取的数对个数
-                    for (int j = 0; j < 8; j++) {
-                        bytesNum1[j] = inBuffer[inPointer++];
-                    }
-                    for (int j = 0; j < 8; j++) {
-                        bytesNum2[j] = inBuffer[inPointer++];
-                    }
+                    System.arraycopy(inBuffer, inPointer, bytesNum1, 0, 8);
+                    inPointer += 8;
+                    System.arraycopy(inBuffer, inPointer, bytesNum2, 0, 8);
+                    inPointer += 8;
 
                     final double num1 = bytesToDouble(bytesNum1);
                     final double num2 = bytesToDouble(bytesNum2);
@@ -158,31 +106,41 @@ public class Test {
                     if (remainRead == maxRead && i == 0)
                         groupFirst[groupNum] = num1;
 
-                    outBufferStore(num1, num2);
+                    out.write(num1 + ", " + num2 + '\n');
                 }
 
-                remainRead -= readLen;
+                remainRead -= bytesRead;
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public static void checkFirstNum(final int groupNum) {
-        try {
-            in.seek(groupStart[groupNum]);
-            System.out.print("第" + (groupNum + 1) + "组开始位置：" + groupStart[groupNum] + " 的第一个数为：");
-            final double realFirst = in.readDouble();
-            System.out.print(realFirst);
-            System.out.println(realFirst == groupFirst[groupNum] ? "，位置正确" : "，位置错误");
-        } catch (IOException e) {
-            e.printStackTrace();
+    public static void checkFirstNum() {
+        for (int i = 0; i < 3; i++) {
+            if (groupCount[i] == 0) {
+                System.out.println("第" + (i + 1) + "组为空，未检查本组开始位置");
+                continue;
+            }
+
+            try {
+                inR.seek(groupStart[i]);
+                System.out.print("第" + (i + 1) + "组开始位置：" + groupStart[i] + " 的第一个数为：");
+                final double realFirst = inR.readDouble();
+                System.out.print(realFirst);
+                System.out.println(realFirst == groupFirst[i] ? "，位置正确" : "，位置错误");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
     public static void checkPairPass() {
         for (int i = 0; i < 3; i++) {
-            System.out.println("第" + (i + 1) + "组预计有" + groupCount[i] + "对，实际通过" + groupPassCount[i + 1] + "对");
+            if (groupCount[i] == 0)
+                System.out.println("第" + (i + 1) + "组为空，未检查数对情况");
+            else
+                System.out.println("第" + (i + 1) + "组预计有" + groupCount[i] + "对，实际通过" + groupPassCount[i + 1] + "对");
         }
 
         System.out.println("完全非法的数对有：" + groupPassCount[0] + "对");
@@ -190,40 +148,57 @@ public class Test {
 
     public static void main(String[] args) {
         try {
-            in = new RandomAccessFile(inFilePath, "r");
-            out = new FileOutputStream(outFilePath);
+            File inFile = new File(inFilePath);
+            File outFile = new File(outFilePath);
+            inB = new BufferedInputStream(new FileInputStream(inFile), BUFFER_SIZE);
+            inR = new RandomAccessFile(inFile, "r");
+            out = new BufferedWriter(new FileWriter(outFile), BUFFER_SIZE);
             for (int i = 0; i < 4; i++) {
                 groupPassCount[i] = 0;
             }
             final long startTime = System.currentTimeMillis();
+            byte[] intBytes = new byte[4];
 
-            final int groupCountAll = outBufferStore(in.readInt());
-
-            for (int i = 0; i < 3; i++) {
-                groupCount[i] = outBufferStore(in.readInt());
-                groupStart[i] = outBufferStore(in.readInt());
-            }
-
-            final int empty = outBufferStore(in.readInt());
+            final int groupCountAll = bytesToInteger(inB.read(intBytes), intBytes);
+            out.write(groupCountAll + "\n");
 
             for (int i = 0; i < 3; i++) {
-                inBufferStore(i);
+                groupCount[i] = bytesToInteger(inB.read(intBytes), intBytes);
+                out.write(groupCount[i] + "\n");
+                groupStart[i] = bytesToInteger(inB.read(intBytes), intBytes);
+                out.write(groupStart[i] + "\n");
             }
+
+            final int empty = bytesToInteger(inB.read(intBytes), intBytes);
+            out.write(empty + "\n");
+
+            for (int i = 0; i < 3; i++) {
+                checkGroup(i);
+            }
+            out.flush();
+
+            System.out.println("*******************************************基本信息*******************************************");
+            System.out.println("总数：" + groupCountAll + "对");
+            for (int i = 0; i < 3; i++) {
+                System.out.println("第" + (i + 1) + "组：" + groupCount[i] + "对");
+                System.out.println("第" + (i + 1) + "组起始位置：" + groupStart[i]);
+            }
+            System.out.println("数据文件大小：" + formatSize(inFile.length()));
+            System.out.println("**********************************************************************************************");
 
             System.out.println("*******************************************检测信息*******************************************");
-            for (int i = 0; i < 3; i++) {
-                checkFirstNum(i);
-            }
-
+            checkFirstNum();
+            System.out.println();
             checkPairPass();
-            flushOutBuffer();
+            System.out.println("生成文件大小：" + formatSize(outFile.length()));
+            System.out.println("\n用时：" + (System.currentTimeMillis() - startTime) + "ms");
+            System.out.println("**********************************************************************************************");
 
-            System.out.println("用时" + (System.currentTimeMillis() - startTime) + "ms");
-
-            in.close();
+            inB.close();
+            inR.close();
             out.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println(e.getMessage());
         }
     }
 }
