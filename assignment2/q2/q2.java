@@ -3,20 +3,21 @@ package org.cn.edu.tongji;
 import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;
 import org.graphstream.graph.implementations.SingleGraph;
+import org.graphstream.ui.swingViewer.ViewPanel;
+import org.graphstream.ui.view.Viewer;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
-import java.io.BufferedReader;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 public class Main {
     private static final int MAX_HOPS = 3;
@@ -25,7 +26,7 @@ public class Main {
 
     public static void main(String[] args) {
 //        String[] seedUrls = {"https://www.tongji.edu.cn", "https://www.pku.edu.cn", "http://www.sina.com.cn", "https://www.mit.edu"};
-        String[] seedUrls = {"https://www.tongji.edu.cn", "https://www.pku.edu.cn", "http://www.sina.com.cn"};
+        String[] seedUrls = {"https://www.tongji.edu.cn" }; // for test
 
         Graph graph = new SingleGraph("WebCrawler");
         Set<String> visitedUrls = new HashSet<>();
@@ -43,7 +44,46 @@ public class Main {
 
         printGraphStats(graph);
         System.out.println("花费时间：" + (endTime - startTime) + "ms");
-        graph.display();
+        showGraph(graph);
+    }
+
+    public static void showGraph(Graph graph) {
+        JFrame frame = new JFrame("Graph Viewer");
+        frame.setLayout(new GridLayout());
+        frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+        int screenWidth = (int) screenSize.getWidth() / 2;
+        int screenHeight = (int) screenSize.getHeight() / 2;
+        frame.setBounds(0, 0, screenWidth, screenHeight);
+        frame.setPreferredSize(new Dimension(screenWidth, screenHeight));
+
+        JPanel panel = new JPanel();
+        panel.setLayout(new GridLayout());
+        frame.add(panel);
+
+        Viewer viewer = new Viewer(graph, Viewer.ThreadingModel.GRAPH_IN_ANOTHER_THREAD);
+        viewer.enableAutoLayout();
+        ViewPanel viewPanel = viewer.addDefaultView(false);
+        Rectangle rec = panel.getBounds();
+        viewPanel.setBounds(0, 0, rec.width, rec.height);
+        viewPanel.setPreferredSize(new Dimension(rec.width, rec.height));
+        panel.add(viewPanel);
+
+        viewPanel.addMouseWheelListener(new MouseWheelListener() {
+            @Override
+            public void mouseWheelMoved(MouseWheelEvent mwe) {
+                zoomGraphMouseWheelMoved(mwe, viewPanel);
+            }
+        });
+
+        frame.setVisible(true);
+    }
+
+    private static void zoomGraphMouseWheelMoved(MouseWheelEvent mwe, ViewPanel viewPanel) {
+        int rotation = mwe.getWheelRotation();
+        double scaleFactor = 1.1;
+        double zoomFactor = Math.pow(scaleFactor, rotation);
+        viewPanel.getCamera().setViewPercent(viewPanel.getCamera().getViewPercent() * zoomFactor);
     }
 
     private static void printGraphStats(Graph graph) {
@@ -64,15 +104,6 @@ public class Main {
         System.out.println("图结点数量：" + nodeCount);
         System.out.println("图边数量：" + edgeCount);
         System.out.println("入度最大的结点URL：" + maxInDegreeNode + "（入度：" + maxInDegree + "）");
-    }
-
-    public static boolean isValidUrl(String url) {
-        // 匹配网址的正则表达式
-        String regex = "(((https|http)?://)?([a-z0-9]+[.])|(www.))"
-                + "\\w+[.|\\/]([a-z0-9]{0,})?[[.]([a-z0-9]{0,})]+((/[\\S&&[^,;\u4E00-\u9FA5]]+)+)?([.][a-z0-9]{0,}+|/?)";
-        Pattern pattern = Pattern.compile(regex);
-        // 进行正则匹配判断
-        return pattern.matcher(url).matches();
     }
 
     public static boolean sameURL(String url1, String url2) {
@@ -105,65 +136,49 @@ public class Main {
     }
 
     private static void jumpUrl(String url, Graph graph, Set<String> visitedUrls, int hops) {
-//        System.out.println("current is " + url);
         if (hops > MAX_HOPS) {
             return;
         }
         try {
-            URL url1 = new URL(url);
-            HttpURLConnection httpURLConnection = (HttpURLConnection) url1.openConnection();
-            httpURLConnection.setRequestMethod("GET");
-            httpURLConnection.setConnectTimeout(CONNECTION_TIMEOUT_MS);
+            Document document = Jsoup.connect(url)
+                    .timeout(CONNECTION_TIMEOUT_MS)
+                    .get();
+            Elements links = document.select("a[href]");
 
-
-            int responseCode = httpURLConnection.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                BufferedReader reader = new BufferedReader(new InputStreamReader(httpURLConnection.getInputStream()));
-                String line;
-                StringBuilder content = new StringBuilder();
-                while ((line = reader.readLine()) != null) {
-                    content.append(line);
+            int externalUrlsCount = 0;
+            for (Element link: links) {
+                String linkUrl = link.attr("href");
+                // 判断可用网址
+                if (!linkUrl.startsWith("http")) {
+                    continue;
                 }
-                reader.close();
-
-                Document document = Jsoup.parse(content.toString());
-                Elements links = document.select("a[href]");
-
-
-
-                int externalUrlsCount = 0;
-                for (Element link: links) {
-                    String linkUrl = link.absUrl("href");
-                    if (!isValidUrl(linkUrl)) {
-                        continue;
-                    }
-                    if (visitedUrls.contains(linkUrl)) {
-                        continue;
-                    }
-                    if (sameURL(url, linkUrl)) {
-                        continue;
-                    }
-                    visitedUrls.add(linkUrl);
-                    if (!linkUrl.isBlank() && externalUrlsCount < MAX_EXTERNAL_URLS) {
-
-                        externalUrlsCount++;
-                        // 添加节点时，在节点的标签中添加对应的图中节点ID
-                        Node node = graph.addNode(linkUrl);
-                        node.addAttribute("ui.label", node.getId());
+                // 判断域名相同
+                if (sameURL(url, linkUrl)) {
+                    continue;
+                }
+                // 判断访问过
+                if (visitedUrls.contains(linkUrl)) {
+                    try {
                         graph.addEdge(url + "-" + linkUrl, url, linkUrl, true);
-                        jumpUrl(linkUrl, graph, visitedUrls, hops + 1);
+                    } catch (Exception e) {
+//                        System.out.println("已经有这条边");
                     }
+                    continue;
                 }
+                externalUrlsCount++;
+                // 访问外部网址数量够了
+                if (externalUrlsCount >= MAX_EXTERNAL_URLS) {
+                    continue;
+                }
+                // 没访问过就添加进入哈希表
+                visitedUrls.add(linkUrl);
+                Node node = graph.addNode(linkUrl);
+                node.addAttribute("ui.label", node.getId());
+                graph.addEdge(url + "-" + linkUrl, url, linkUrl, true);
+                jumpUrl(linkUrl, graph, visitedUrls, hops + 1);
             }
-
-            httpURLConnection.disconnect();
-        } catch (MalformedURLException e) {
-            throw new RuntimeException(e);
         } catch (IOException e) {
-            if (!(e instanceof java.net.SocketTimeoutException)) {
-                throw new RuntimeException(e);
-            }
+            System.out.println("连接" + url + "出问题~");
         }
-
     }
 }
