@@ -1,5 +1,6 @@
 *.dat
 *.txt
+*.ser
 
 target/
 !.mvn/wrapper/maven-wrapper.jar

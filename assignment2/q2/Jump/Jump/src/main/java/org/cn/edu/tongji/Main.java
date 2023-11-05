@@ -25,14 +25,16 @@ public class Main {
     private static final int CONNECTION_TIMEOUT_MS = 5000;
 
     public static void main(String[] args) {
-        String[] seedUrls = {"https://www.tongji.edu.cn", "https://www.pku.edu.cn", "http://www.sina.com.cn", "https://www.mit.edu"};
-//        String[] seedUrls = {"https://www.tongji.edu.cn" }; // for test
+//        String[] seedUrls = {"https://www.tongji.edu.cn", "https://www.pku.edu.cn", "http://www.sina.com.cn", "https://www.mit.edu"};
+        String[] seedUrls = {"https://www.tongji.edu.cn" }; // for test
 
         Graph graph = new SingleGraph("WebCrawler");
         Set<String> visitedUrls = new HashSet<>();
 
+        // 开始计时
         long startTime = System.currentTimeMillis();
 
+        // 进入递归
         for (String seedUrl: seedUrls) {
             Node node = graph.addNode(seedUrl);
             node.addAttribute("ui.label", node.getId());
@@ -40,10 +42,13 @@ public class Main {
             jumpUrl(seedUrl, graph, visitedUrls, 0);
         }
 
+        // 结束及时
         long endTime = System.currentTimeMillis();
 
+        // 打印所需信息
         printGraphStats(graph);
         System.out.println("花费时间：" + (endTime - startTime) + "ms");
+        // 画图
         showGraph(graph);
     }
 
@@ -175,10 +180,11 @@ public class Main {
                 Node node = graph.addNode(linkUrl);
                 node.addAttribute("ui.label", node.getId());
                 graph.addEdge(url + "-" + linkUrl, url, linkUrl, true);
+                System.out.println(url + "->" + linkUrl);
                 jumpUrl(linkUrl, graph, visitedUrls, hops + 1);
             }
         } catch (IOException e) {
-            System.out.println("连接" + url + "出问题~");
+//            System.out.println("连接" + url + "出问题~");
         }
     }
 }
