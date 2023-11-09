@@ -1,5 +1,7 @@
 package org.cn.edu.tongji.client;
 
+import org.cn.edu.tongji.util.ReceiveFile;
+
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.net.InetSocketAddress;
@@ -34,11 +36,10 @@ public class Download {
         if (dotIndex > 0) {
             this.fileExt = this.fileName.substring(dotIndex + 1);
             this.fileName = this.fileName.substring(0, dotIndex);
-            this.hashTableFilePath = this.fileName + ".ser";
         } else {
             this.fileExt = "";
-            this.hashTableFilePath = this.fileName + ".ser";
         }
+        this.hashTableFilePath = this.fileName + ".ser";
         hash = null;
     }
 
@@ -75,7 +76,6 @@ public class Download {
                         chunkToSocketIndex.put(key, i);
                     }
                 }
-//                System.out.println(chunkToSocketIndex);
                 // 设置非阻塞模式
                 socketChannels[i].configureBlocking(false);
                 // 发送请求类型
@@ -84,7 +84,7 @@ public class Download {
                 requestBuffer.flip();
                 socketChannels[i].write(requestBuffer);
             }
-            // 请求需要下载的文件
+            // 发送请求需要下载的文件名
             for (int i = 0; i < chunkCount; ++i) {
                 // 选择对应的通道
                 SocketChannel socketChannel = socketChannels[chunkToSocketIndex.get(i)];
@@ -103,9 +103,24 @@ public class Download {
                 fileNameBuffer.clear();
 
                 System.out.println("发送文件名" + chunkFilePath + "成功");
-
             }
-
+            ByteBuffer test = ByteBuffer.allocate(Integer.BYTES);
+            // 接收文件
+//            for (SocketChannel socketChannel: socketChannels) {
+//                while (true) {
+//                    // 接收文件名长度
+//                    ByteBuffer fileNameLengthBuffer = ByteBuffer.allocate(Integer.BYTES);
+//                    if (socketChannel.read(fileNameLengthBuffer) < 0) {
+//                        break;
+//                    }
+//                    fileNameLengthBuffer.flip();
+//                    int fileNameLength = fileNameLengthBuffer.getInt();
+//                    System.out.println("文件名长度为: " + fileNameLength);
+//                    // 得到文件名长度后接收文件并写入磁盘
+//                    ReceiveFile receiveFile = new ReceiveFile(socketChannel, fileNameLength, basePath);
+//                    receiveFile.receive();
+//                }
+//            }
 
             // 关闭连接
             for (int i = 0; i < socketChannels.length; ++i) {

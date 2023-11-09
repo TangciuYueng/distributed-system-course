@@ -108,6 +108,107 @@ servers are connected in a **logical hierarchy** called **synchronization subnet
 
 ### Logical Clock Synchronization
 Logical clocks are used to define **an order of events** without measuring the physical time at which the events occurred
-不关注timestamp的值，而是直接关注事件的次序
+不关注timestamp的值，而是直接关注**事件的次序**
+不需要硬件，成本更低
+#### Lamport's Logical Clock
+The expression $a \rightarrow b$ read as "a happened before b"
+执行完了再发消息
+
+**happened-before** relation is transitive(可传递性)
+
+assign a logical time value `C(a)` on which all processes agree
+
+哪个先发生哪个就小 if $a \rightarrow b$, then C(a) < C(b)
+
+C must always go forward(increasing)时间不可逆转！
+
+通过Middleware layer的形式实现
+
+
+##### Example
+![](./ref/note8-4.PNG)
+P3发回给P2的时候出现差错(两者逻辑时钟增长速率不同，出现"time reverse")，需要同步
+直接在收到的senderMessage的基础上 + 1(currentTime = timestamp + 1)
+![](./ref/note8-5.PNG)
+##### Limitation
+但是不能说C(a) < C(b)就说明$a \rightarrow b$
+![](./ref/note8-6.PNG)
+
+However, Lamport’s clock **cannot guarantee perfect ordering of events** by just observing the time values of two arbitrary events
+
+#### Vector Clock
+更加复杂但是功能强大
+
+记录二维的向量，每个进程都记录自己所知道的别的进程的逻辑时钟值(事件发生的个数)
+不同的进程通过传消息来知道别人的
+这样就可以逆推**特定**事件的发生顺序了
+
+if $VC_i(a) < VC_i(b)$, then we can infer that $a \rightarrow b$
+
+Supports causal ordering of events!
+
+##### Example
+![](./ref/note8-7.PNG)
+接收的两个步骤
+- 绿色的是取当前的VC和发送过来的信息中的最大值
+- 然后再增加$VC_j[j]$
+
 ## Mutual Exclusion
+通过消息传递
+Mutual exclusion algorithms are classified into two categories
+- Perssion-based Approaches
+  - process去访问共享资源的时候要得到许可
+  - 通过专门的单独的Coordinator管理
+  - Coordinator坏了就寄了
+- Token-based Approaches
+  - 每个共享资源都有一个令牌，一个process有了这个token才能去访问资源
+  - token在processes之间传递、通信
+  - 令牌丢了就抓瞎
+
+### Perssion-based
+- Centralized Algorithms
+
+  最简单，但容错机制不行，Coordinator一旦故障就寄了
+
+  负载也不行，排队的很多，又要处理排队，又要释放
+
+  Coordinator，通常标记为C，负责管理共享资源的访问。具体解释如下：
+
+  1. 协调者（C）维护一个请求访问资源的队列。
+
+  2. 当一个进程想要访问共享资源时，它会向协调者发送一个请求消息，请求访问资源。
+
+  3. 当协调者收到请求时：
+    - 如果没有其他进程当前正在访问该资源，协调者会通过发送一个"grant"消息来授予访问权限给请求的进程。
+    - 如果另一个进程正在访问资源，协调者会将请求排入队列，并不会立即回复请求。
+
+  4. 进程在访问资源之后，释放独占访问权限。
+
+  5. 协调者会随后向队列中的下一个进程发送"grant"消息，以便下一个进程可以访问资源。
+
+- Decentralized Algorithms
+  使用了分布式哈希表(Distributed Hash Tbale, DHT)，哈希表实现均衡负载
+  某个资源的复制n次的replica起名为`rname-i`
+  Every replica **has its own coordinator** for controlling access
+
+  通过majority vote算法去选举coordinators，超过一半才可以 m > n / 2
+  如果一个coordinator不想对一个进程投票(因为已经vote for another)，就发送"permission-denied"
+
+  从而规避了一个coordinator宕机就寄了
+  但是网络带宽消耗更多，性能会慢
+### Token-based
+每一个资源都有其对应的令牌
+沿着一个环传递
+等待的时间是处理时间 + 传递token的时间
+![](./ref/note8-8.PNG)
+
+- 去中心化
+- avoid starvation，一个环肯定能传到
+- 没有进程需要某个资源的时候，其令牌高速转圈
+- 令牌丢失就要重新生成
+- Dead processes must be purged from the ring，不然就一直阻塞了
+
+### Comparison
+![](./ref/note8-9.PNG)
+
 ## Election Algorithm

@@ -2,22 +2,16 @@ package org.cn.edu.tongji.client;
 
 import org.cn.edu.tongji.util.SendFile;
 
-import java.io.IOException;
-import java.io.ObjectOutputStream;
-import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
+import java.io.*;
+import java.net.Socket;
+import java.net.UnknownHostException;
 import java.nio.channels.FileChannel;
-import java.nio.channels.SocketChannel;
-import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
 import java.nio.charset.StandardCharsets;
-import java.net.InetSocketAddress;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Hashtable;
-import java.util.List;
-import java.util.Random;
+import java.nio.file.StandardOpenOption;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -28,17 +22,14 @@ public class Upload {
     private String fileExt;
     private String hashTableFilePath;
     private int chunkCount;
-    private Hashtable<Integer, Integer> hash;
+    // 端口号到文件块列表的映射
+    private HashMap<Integer, List<Integer>> hash;
+
     private static final String BASE_CHUNK_FILE_PATH = "./";
-    private static final char request = 'U';
-    // 1024KB
-    // private static final int CHUNK_SIZE = 1024 * 1024;
-    private static final int CHUNK_SIZE = 32;
-    // 4 * 1024B
-//    private static final int BUFFER_SIZE = 4 * 1024;
-    // 连接服务端
+    private static final String request = "U";
+    private static final int CHUNK_SIZE = 1024 * 1024;
     private static String SERVER_HOST = "localhost";
-    private static int[] SERVER_PORTS = {8888, 8889};
+    private static int[] SERVER_PORTS = {8887, 8888, 8889};
 
     public Upload(String filePath) {
         this.filePath = filePath;
@@ -52,11 +43,10 @@ public class Upload {
         } else {
             this.fileExt = "";
         }
-        hash = new Hashtable<>();
-        hashTableFilePath = BASE_CHUNK_FILE_PATH + fileName + ".ser";
-        // System.out.println(this.fileName + " " + this.filePath + " " + this.fileExt);
+        hash = new HashMap<>();
+        hashTableFilePath = BASE_CHUNK_FILE_PATH + fileName + "." + fileExt + ".ser";
     }
-    // 将文件分割成为多个块
+    // 将文件分割成多个块
     public void getChunk() {
         try (RandomAccessFile file = new RandomAccessFile(filePath, "r");
              FileChannel fileChannel = file.getChannel()) {
@@ -94,72 +84,73 @@ public class Upload {
             e.printStackTrace();
         }
     }
-    // 上传服务端
     public void sendChunk() {
-        SocketChannel[] socketChannels = new SocketChannel[SERVER_PORTS.length];
+        Socket[] sockets = new Socket[SERVER_PORTS.length];
         try {
             // 申请三个连接
-            for (int i = 0; i < socketChannels.length; ++i) {
-                socketChannels[i] = SocketChannel.open(new InetSocketAddress(SERVER_HOST, SERVER_PORTS[i]));
-                // 设置非阻塞模式
-                socketChannels[i].configureBlocking(false);
-                // 发送请求类型
-                ByteBuffer requestBuffer = ByteBuffer.allocate(Character.BYTES);
-                requestBuffer.putChar(request);
-                requestBuffer.flip();
-                socketChannels[i].write(requestBuffer);
+            for (int i = 0; i < sockets.length; ++i) {
+                sockets[i] = new Socket(SERVER_HOST, SERVER_PORTS[i]);
+                OutputStream outputStream = sockets[i].getOutputStream();
+                outputStream.write(request.getBytes(StandardCharsets.UTF_8));
             }
             // 传输块文件
             for (int i = 0; i < chunkCount; ++i) {
-                // 随机选择传输目标服务器
                 Random random = new Random();
-                int randomPortIndex = random.nextInt(socketChannels.length);
-                // 哈希表记录
-                hash.put(i, SERVER_PORTS[randomPortIndex]);
-                // 确定目标通道
-                SocketChannel socketChannel = socketChannels[randomPortIndex];
-
+                int randomPortIndex = random.nextInt(sockets.length);
+                // 映射表记录
+                if (hash.containsKey(SERVER_PORTS[randomPortIndex])) {
+                    List<Integer> v = hash.get(SERVER_PORTS[randomPortIndex]);
+                    v.add(i);
+                    hash.put(SERVER_PORTS[randomPortIndex], v);
+                } else {
+                    hash.put(SERVER_PORTS[randomPortIndex], new ArrayList<>(Arrays.asList(i)));
+                }
                 // 文件名
                 String chunkFilePath = BASE_CHUNK_FILE_PATH + fileName + i + "." + fileExt;
                 // 打开chunk文件
-                try (FileChannel fileChannel = FileChannel.open(Paths.get(chunkFilePath), StandardOpenOption.READ)) {
-                    SendFile sendFile = new SendFile(chunkFilePath, fileChannel, socketChannel);
+                try (FileChannel fileChannel = FileChannel.open(Paths.get(chunkFilePath), StandardOpenOption.CREATE)) {
+                    DataOutputStream dataOutputStream = new DataOutputStream(sockets[randomPortIndex].getOutputStream());
+                    SendFile sendFile = new SendFile(fileName + i + "." + fileExt, fileChannel, dataOutputStream);
                     sendFile.send();
 
-                    System.out.println("发送文件" + chunkFilePath + "成功");
+                    System.out.println("发送文件成功" + chunkFilePath);
                 } catch (IOException e) {
-                    System.out.println("发送文件" + chunkFilePath + "出问题： " + e.getMessage());
+                    e.printStackTrace();
                 }
             }
-            // 哈希表序列化写入文件
-            try (ObjectOutputStream objectOut = new ObjectOutputStream(
-                    Files.newOutputStream(Path.of(hashTableFilePath), StandardOpenOption.CREATE))) {
-                objectOut.writeObject(hash);
-                System.out.println("Hashtable已成功序列化并存入文件。");
+//            System.out.println("当前映射表记录: " + hash);
+            // 哈希表写入文件
+            try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(
+                    Files.newOutputStream(Path.of(hashTableFilePath), StandardOpenOption.CREATE)
+            )) {
+                objectOutputStream.writeObject(hash);
+                System.out.println("哈希表写入成功");
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            // 关闭连接
-            for (int i = 0; i < socketChannels.length; ++i) {
-                socketChannels[i].close();
-            }
+        } catch (UnknownHostException e) {
+            throw new RuntimeException(e);
         } catch (IOException e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         } finally {
-            for (int i = 0; i < socketChannels.length; ++i) {
-                if (socketChannels[i] != null && socketChannels[i].isOpen()) {
+            // 关闭连接
+            for (int i = 0; i < sockets.length; ++i) {
+                if (sockets[i] != null && !sockets[i].isClosed()) {
                     try {
-                        socketChannels[i].close();
+                        sockets[i].close();
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        System.err.println("无法关闭连接: " + e.getMessage());
                     }
                 }
             }
         }
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
     }
 
     public static void main(String[] args) {
-        Upload upload = new Upload("./test.txt");
+        Upload upload = new Upload("./test.pdf");
         upload.getChunk();
         upload.sendChunk();
     }
