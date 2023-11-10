@@ -40,8 +40,6 @@ public class Upload {
         if (dotIndex > 0) {
             this.fileExt = this.fileName.substring(dotIndex + 1);
             this.fileName = this.fileName.substring(0, dotIndex);
-        } else {
-            this.fileExt = "";
         }
         hash = new HashMap<>();
         hashTableFilePath = BASE_CHUNK_FILE_PATH + fileName + "." + fileExt + ".ser";
@@ -113,7 +111,7 @@ public class Upload {
                     SendFile sendFile = new SendFile(fileName + i + "." + fileExt, fileChannel, dataOutputStream);
                     sendFile.send();
 
-                    System.out.println("发送文件成功" + chunkFilePath);
+//                    System.out.println("发送文件成功" + chunkFilePath);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -124,7 +122,7 @@ public class Upload {
                     Files.newOutputStream(Path.of(hashTableFilePath), StandardOpenOption.CREATE)
             )) {
                 objectOutputStream.writeObject(hash);
-                System.out.println("哈希表写入成功");
+//                System.out.println("哈希表写入成功");
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -149,9 +147,40 @@ public class Upload {
 //        }
     }
 
+    private void deleteChunkFile() {
+        // 循环读取块的过程放入一个线程池中
+        ExecutorService executorService = Executors.newFixedThreadPool(chunkCount);
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+        for (int i = 0; i < chunkCount; ++i) {
+            int chunkIndex = i;
+            // 封装为异步任务交给线程池处理
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                // 删除临时chunk文件
+                String chunkFilePath = BASE_CHUNK_FILE_PATH + fileName + chunkIndex + "." + fileExt;
+                File chunkFile = new File(chunkFilePath);
+                if (chunkFile.exists()) {
+                    chunkFile.delete();
+                }
+            }, executorService);
+            futures.add(future);
+        }
+        // 等待所有任务完成关闭线程池
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        executorService.shutdown();
+    }
+
+    public static void UploadFile(String filePath) {
+        Upload upload = new Upload(filePath);
+        upload.getChunk();
+        upload.sendChunk();
+        upload.deleteChunkFile();
+    }
+
     public static void main(String[] args) {
         Upload upload = new Upload("./test.pdf");
         upload.getChunk();
         upload.sendChunk();
+        upload.deleteChunkFile();
     }
 }

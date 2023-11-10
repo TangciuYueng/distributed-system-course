@@ -1,6 +1,5 @@
 package org.cn.edu.tongji.server;
 
-import jdk.jfr.FlightRecorder;
 import org.cn.edu.tongji.util.ReceiveFile;
 import org.cn.edu.tongji.util.SendFile;
 
@@ -13,17 +12,17 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Server implements Runnable {
     private int serverPort;
-    private String bashPath;
-    private List<String> chunkfileNames = new ArrayList<>();
+    private String basePath;
+    // 保证线程安全
+    private ConcurrentLinkedQueue<String> chunkfileNames = new ConcurrentLinkedQueue<>();
 
     public Server(int serverPort, String basePath) {
         this.serverPort = serverPort;
-        this.bashPath = basePath;
+        this.basePath = basePath;
     }
 
 
@@ -45,9 +44,8 @@ public class Server implements Runnable {
     }
 
     private void handleClient(Socket socket) {
-        try {
-            DataInputStream dataInputStream = new DataInputStream(socket.getInputStream());
-            DataOutputStream dataOutputStream = new DataOutputStream(socket.getOutputStream());
+        try (DataInputStream dataInputStream = new DataInputStream(socket.getInputStream());
+                DataOutputStream dataOutputStream = new DataOutputStream(socket.getOutputStream())) {
             char request = (char) dataInputStream.readByte();
             System.out.println(request);
             if (request == 'U') {
@@ -68,7 +66,7 @@ public class Server implements Runnable {
             try {
                 int fileNameLength = dataInputStream.readInt();
                 byte[] chunkName = new byte[fileNameLength];
-                dataInputStream.read(chunkName);
+                dataInputStream.readFully(chunkName);
                 chunkfileNames.add(new String(chunkName, "UTF-8"));
                 System.out.println(serverPort + " receive file name " + new String(chunkName, "UTF-8"));
             } catch (Exception e) {
@@ -79,7 +77,7 @@ public class Server implements Runnable {
         // 发送文件
         for (String fileName: chunkfileNames) {
             System.out.println("send fileName" + fileName);
-            Path filePath = Paths.get(bashPath, fileName);
+            Path filePath = Paths.get(basePath, fileName);
             System.out.println("filePath " + filePath);
             try (FileChannel fileChannel = FileChannel.open(filePath, StandardOpenOption.READ)) {
                 SendFile sendFile = new SendFile(fileName, fileChannel, dataOutputStream);
@@ -104,7 +102,7 @@ public class Server implements Runnable {
                 break;
             }
             // 接收并写入文件
-            ReceiveFile receiveFile = new ReceiveFile(dataInputStream, bashPath, fileNameLength);
+            ReceiveFile receiveFile = new ReceiveFile(dataInputStream, basePath, fileNameLength);
             receiveFile.receive();
         }
     }

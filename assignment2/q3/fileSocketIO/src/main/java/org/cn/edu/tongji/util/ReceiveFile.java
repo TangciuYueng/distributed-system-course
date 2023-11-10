@@ -19,6 +19,7 @@ public class ReceiveFile {
         this.basePath = basePath;
         this.fileNameLength = fileNameLength;
     }
+    // 文件接收并写入目标文件夹
     public void receive() throws IOException {
         // 接收文件名
         byte[] fileNameBuffer = new byte[fileNameLength];

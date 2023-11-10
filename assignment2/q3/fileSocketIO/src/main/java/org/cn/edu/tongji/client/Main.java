@@ -1,40 +1,66 @@
 package org.cn.edu.tongji.client;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) throws IOException {
-        Scanner sc = new Scanner(System.in);
-        System.out.println("请输入命令: ");
-        String command = sc.next().toString();
+        while (true) {
+            Scanner sc = new Scanner(System.in);
+            System.out.println("请输入命令: ");
+            String command = sc.nextLine();
 
-        if (command.equals("put")) {
-            long startTime = System.currentTimeMillis();
-            System.out.println("PUT!");
-            long endTime = System.currentTimeMillis();
-            System.out.println("上传用时: " + (endTime - startTime) + "ms");
-        } else if (command.equals("get")) {
-            long startTime = System.currentTimeMillis();
-            System.out.println("GET!");
-            long endTime = System.currentTimeMillis();
-            System.out.println("上传用时: " + (endTime - startTime) + "ms");
-        } else if (command.equals("cput")) {
-            long startTime = System.currentTimeMillis();
-            System.out.println("CPUT!");
-            long endTime = System.currentTimeMillis();
-            System.out.println("上传用时: " + (endTime - startTime) + "ms");
-        } else if (command.equals("cget")) {
-            long startTime = System.currentTimeMillis();
-            System.out.println("CGET!");
-            long endTime = System.currentTimeMillis();
-            System.out.println("上传用时: " + (endTime - startTime) + "ms");
+            if (command.startsWith("put")) {
+                // 去掉put及其后面的空格
+                String filePath = command.replaceFirst("^put\\s+", "");
+                // 检查是否在系统中已经存在的文件的路径
+                if (isFilePath(filePath)) {
+                    long startTime = System.currentTimeMillis();
+                    System.out.println("上传的文件为 " + filePath);
+                    Upload.UploadFile(filePath);
+                    long endTime = System.currentTimeMillis();
+                    System.out.println("上传用时: " + (endTime - startTime) + "ms");
+                } else {
+                    System.out.println("文件不存在，请重新输入~");
+                }
+            } else if (command.startsWith("get")) {
+                // 去掉get及其后面的空格
+                String fileName = command.replaceFirst("^get\\s+", "");
+                long startTime = System.currentTimeMillis();
+                Download.downloadFile(fileName);
+                long endTime = System.currentTimeMillis();
+                System.out.println("下载用时: " + (endTime - startTime) + "ms");
+            } else if (command.equals("cput")) {
+                long startTime = System.currentTimeMillis();
+                System.out.println("CPUT!");
+                long endTime = System.currentTimeMillis();
+                System.out.println("上传用时: " + (endTime - startTime) + "ms");
+            } else if (command.equals("cget")) {
+                long startTime = System.currentTimeMillis();
+                System.out.println("CGET!");
+                long endTime = System.currentTimeMillis();
+                System.out.println("上传用时: " + (endTime - startTime) + "ms");
 
-        } else if (command.equals("check")) {
-            System.out.println("CGET!");
+            } else if (command.equals("check")) {
+                System.out.println("CGET!");
+            } else if (command.equals("q")) {
+                break;
+            } else {
+                System.out.println("没有这个命令~请输入: put/get/cput/cget/check/q");
+            }
+        }
 
-        } else {
-            System.out.println("没有这个命令~请输入: put/get/cput/cget/check");
+    }
+
+    private static boolean isFilePath(String filePath) {
+        try {
+            Path path = Paths.get(filePath);
+            return Files.isRegularFile(path);
+        } catch (Exception e) {
+            return false;
         }
     }
 }
