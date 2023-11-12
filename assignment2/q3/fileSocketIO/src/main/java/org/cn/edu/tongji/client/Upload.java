@@ -17,19 +17,19 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class Upload {
-    private String filePath;
-    private String fileName;
-    private String fileExt;
-    private String hashTableFilePath;
-    private int chunkCount;
+    protected String filePath;
+    protected String fileName;
+    protected String fileExt;
+    protected String hashTableFilePath;
+    protected int chunkCount;
     // 端口号到文件块列表的映射
-    private HashMap<Integer, List<Integer>> hash;
+    protected HashMap<Integer, List<Integer>> hash;
 
-    private static final String BASE_CHUNK_FILE_PATH = "./";
+    protected static final String BASE_CHUNK_FILE_PATH = "./";
     private static final String request = "U";
-    private static final int CHUNK_SIZE = 1024 * 1024;
-    private static String SERVER_HOST = "localhost";
-    private static int[] SERVER_PORTS = {8887, 8888, 8889};
+    protected static final int CHUNK_SIZE = 1024 * 1024;
+    protected static String SERVER_HOST = "localhost";
+    protected static int[] SERVER_PORTS = {8887, 8888, 8889};
 
     public Upload(String filePath) {
         this.filePath = filePath;
@@ -147,7 +147,7 @@ public class Upload {
 //        }
     }
 
-    private void deleteChunkFile() {
+    protected void deleteChunkFile() {
         // 循环读取块的过程放入一个线程池中
         ExecutorService executorService = Executors.newFixedThreadPool(chunkCount);
         List<CompletableFuture<Void>> futures = new ArrayList<>();

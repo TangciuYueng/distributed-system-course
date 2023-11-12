@@ -3,15 +3,14 @@ package org.cn.edu.tongji.server;
 import org.cn.edu.tongji.util.ReceiveFile;
 import org.cn.edu.tongji.util.SendFile;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Server implements Runnable {
@@ -52,11 +51,24 @@ public class Server implements Runnable {
                 handleUpload(dataInputStream);
             } else if (request == 'D') {
                 handleDownload(dataInputStream, dataOutputStream);
+            } else if (request == 'P') {
+                handleCUpload(socket);
+            } else if (request == 'G') {
+                
             } else {
                 System.out.println("request error");
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    private void handleCUpload(Socket socket) {
+        try {
+            CUpload cUpload = new CUpload(socket, basePath);
+            cUpload.handleCUpload();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
