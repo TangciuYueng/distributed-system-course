@@ -31,7 +31,7 @@ public class Server implements Runnable {
             System.out.println("server is on " + serverPort);
             while (true) {
                 try (Socket socket = serverSocket.accept()) {
-                    System.out.println("client connected: " + socket.getInetAddress());
+                    System.out.println("client connected: " + socket.getInetAddress() + serverPort);
                     handleClient(socket);
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -46,7 +46,6 @@ public class Server implements Runnable {
         try (DataInputStream dataInputStream = new DataInputStream(socket.getInputStream());
                 DataOutputStream dataOutputStream = new DataOutputStream(socket.getOutputStream())) {
             char request = (char) dataInputStream.readByte();
-            System.out.println(request);
             if (request == 'U') {
                 handleUpload(dataInputStream);
             } else if (request == 'D') {

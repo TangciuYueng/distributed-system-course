@@ -22,13 +22,15 @@ public class CUpload extends Upload{
     @Override
     public void sendChunk() {
         Socket[] sockets = new Socket[SERVER_PORTS.length];
+        DataOutputStream[] dataOutputStreams = new DataOutputStream[SERVER_PORTS.length];
+        DataInputStream[] dataInputStreams = new DataInputStream[SERVER_PORTS.length];
         try {
             // 初始化socket 发送断点上传请求标志
-            initSocket(sockets);
+            initSocket(sockets, dataOutputStreams);
             // 接收需要上传文件并上传
-            getRequiredChunkFileNameAndSend(sockets);
+            getRequiredChunkFileNameAndSend(sockets, dataInputStreams, dataOutputStreams);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
         } finally {
             // 关闭连接
             for (int i = 0; i < sockets.length; ++i) {
@@ -39,18 +41,35 @@ public class CUpload extends Upload{
                         System.err.println("无法关闭连接: " + e.getMessage());
                     }
                 }
+                try {
+                    if (dataInputStreams[i] != null) {
+                        dataInputStreams[i].close();
+                    }
+                    if (dataOutputStreams[i] != null) {
+                        dataOutputStreams[i].close();
+                    }
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
     }
 
-    private void getRequiredChunkFileNameAndSend(Socket[] sockets) throws IOException {
+    private void getRequiredChunkFileNameAndSend(Socket[] sockets, DataInputStream[] dataInputStreams, DataOutputStream[] dataOutputStreams) throws IOException {
         for (int i = 0; i < sockets.length; ++i) {
-            DataInputStream dataInputStream = new DataInputStream(sockets[i].getInputStream());
+            if (!hash.containsKey(SERVER_PORTS[i])) {
+                continue;
+            }
+            dataInputStreams[i] = new DataInputStream(sockets[i].getInputStream());
+            DataInputStream dataInputStream = dataInputStreams[i];
+//            DataInputStream dataInputStream = new DataInputStream(sockets[i].getInputStream());
             ArrayList<String> requiredChunkFiles = new ArrayList<>();
             // 接收文件名
             while (true) {
                 try {
                     int fileNameLength = dataInputStream.readInt();
+                    // 设置超时 防止阻塞
+                    sockets[i].setSoTimeout(3000);
                     byte[] chunkNameByte = new byte[fileNameLength];
                     dataInputStream.readFully(chunkNameByte);
                     String chunkName = new String(chunkNameByte, StandardCharsets.UTF_8);
@@ -59,10 +78,12 @@ public class CUpload extends Upload{
                     break;
                 }
             }
-            DataOutputStream dataOutputStream = new DataOutputStream(sockets[i].getOutputStream());
+//            DataOutputStream dataOutputStream = new DataOutputStream(sockets[i].getOutputStream());
+            dataOutputStreams[i] = new DataOutputStream(sockets[i].getOutputStream());
+            DataOutputStream dataOutputStream = dataOutputStreams[i];
             // 发送文件
             for (String chunkName: requiredChunkFiles) {
-                Path filePath = Paths.get(BASE_CHUNK_FILE_PATH, fileName);
+                Path filePath = Paths.get(BASE_CHUNK_FILE_PATH, chunkName);
                 try (FileChannel fileChannel = FileChannel.open(filePath, StandardOpenOption.READ)) {
                     SendFile sendFile = new SendFile(chunkName, fileChannel, dataOutputStream);
                     sendFile.send();
@@ -72,6 +93,7 @@ public class CUpload extends Upload{
                     e.printStackTrace();
                 }
             }
+            sockets[i].shutdownOutput();
         }
     }
     private void getHashTable() {
@@ -114,36 +136,36 @@ public class CUpload extends Upload{
         }
     }
 
-    private void initSocket(Socket[] sockets) throws IOException {
+    private void initSocket(Socket[] sockets, DataOutputStream[] dataOutputStreams) throws IOException {
         for (int i = 0; i < sockets.length; ++i) {
+            // 跳过不需要的服务器
+            if (!hash.containsKey(SERVER_PORTS[i])) {
+                continue;
+            }
             sockets[i] = new Socket(SERVER_HOST, SERVER_PORTS[i]);
             // 发送对应端口分配的块号
-            try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(sockets[i].getOutputStream())) {
-                // 发送请求类型
-                objectOutputStream.write(request.getBytes(StandardCharsets.UTF_8));
-                // 发送文件名
-                String fileNameWithExt = fileName + "." + fileExt;
-                byte[] fileNameByte = fileNameWithExt.getBytes();
-                objectOutputStream.writeInt(fileNameByte.length);
-                objectOutputStream.write(fileNameByte);
+            dataOutputStreams[i] = new DataOutputStream(sockets[i].getOutputStream());
+            DataOutputStream dataOutputStream = dataOutputStreams[i];
+            // 发送请求类型
+            dataOutputStream.write(request.getBytes(StandardCharsets.UTF_8));
+            // 发送文件名
+            String fileNameWithExt = fileName + "." + fileExt;
+            byte[] fileNameByte = fileNameWithExt.getBytes();
+            dataOutputStream.writeInt(fileNameByte.length);
+            dataOutputStream.write(fileNameByte);
 
-                List<Integer> v = hash.get(SERVER_PORTS[i]);
+            List<Integer> v = hash.get(SERVER_PORTS[i]);
 
-                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                ObjectOutputStream objectOutputStream1 = new ObjectOutputStream(byteArrayOutputStream);
-
-                objectOutputStream1.writeObject(v);
-                objectOutputStream1.flush();
-
-                // List 2 字节数组
-                byte[] byteArray = byteArrayOutputStream.toByteArray();
-                // 字节数组长度
-                objectOutputStream.writeInt(byteArray.length);
-                objectOutputStream.write(byteArray);
-                objectOutputStream.flush();
+            // 发送块分配结果
+            // 发送个数
+            dataOutputStream.writeInt(v.size());
+            // 发送每个块号
+            for (int chunkNumber: v) {
+                dataOutputStream.writeInt(chunkNumber);
             }
 
-            sockets[i].shutdownOutput();
+//            sockets[i].shutdownOutput();
+            // 不能关闭输出流了 待会还要用
         }
     }
 
