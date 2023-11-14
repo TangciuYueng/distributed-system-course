@@ -25,10 +25,10 @@ public class ReceiveFile {
         byte[] fileNameBuffer = new byte[fileNameLength];
         dataInputStream.read(fileNameBuffer);
         String fileName = new String(fileNameBuffer, "UTF-8");
-        System.out.println("received " + fileName);
+//        System.out.println("received " + fileName);
         // 接收文件长度
         long fileLength = dataInputStream.readLong();
-        System.out.println("file length " + fileLength);
+//        System.out.println("file length " + fileLength);
         // 构建文件存储目录
         Path filePath = Paths.get(basePath, fileName);
         // 创建目录

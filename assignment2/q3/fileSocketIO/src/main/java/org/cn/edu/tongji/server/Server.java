@@ -10,7 +10,6 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Server implements Runnable {
@@ -35,6 +34,8 @@ public class Server implements Runnable {
                     handleClient(socket);
                 } catch (IOException e) {
                     e.printStackTrace();
+                } finally {
+                    System.out.println("完成一次连接");
                 }
             }
         } catch (IOException e) {
@@ -53,12 +54,21 @@ public class Server implements Runnable {
             } else if (request == 'P') {
                 handleCUpload(socket);
             } else if (request == 'G') {
-                
+                handleCDownload(socket);
             } else {
                 System.out.println("request error");
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    private void handleCDownload(Socket socket) {
+        try {
+            CDownload cDownload = new CDownload(socket, basePath);
+            cDownload.handleCDownload();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 

@@ -163,11 +163,21 @@ public class CUpload extends Upload{
         }
     }
 
+    public static void CUploadFile(String filePath) {
+        CUpload cUpload = new CUpload(filePath);
+        cUpload.getChunk();
+        cUpload.getHashTable();
+        cUpload.sendChunk();
+        cUpload.saveHashTable();
+        cUpload.deleteChunkFile();
+    }
+
     public static void main(String[] args) {
         CUpload cUpload = new CUpload("test.txt");
         cUpload.getChunk();
         cUpload.getHashTable();
         cUpload.sendChunk();
         cUpload.saveHashTable();
+        cUpload.deleteChunkFile();
     }
 }

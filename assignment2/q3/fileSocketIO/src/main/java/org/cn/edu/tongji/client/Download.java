@@ -19,15 +19,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class Download {
-    private final String hashTableFilePath;
-    private String fileName;
-    private String basePath;
-    private String fileExt;
-    private int chunkCount;
-    private List<Integer> serverPort = new ArrayList<>();
-    private HashMap<Integer, List<Integer>> hash;
+    protected final String hashTableFilePath;
+    protected String fileName;
+    protected String basePath;
+    protected String fileExt;
+    protected int chunkCount;
+    protected List<Integer> serverPort = new ArrayList<>();
+    protected HashMap<Integer, List<Integer>> hash;
     private static final String request = "D";
-    private static final String SERVER_HOST = "localhost";
+    protected static final String SERVER_HOST = "localhost";
     public Download(String fileName) {
         this.fileName = fileName;
         int dotIndex = this.fileName.lastIndexOf(".");
@@ -45,7 +45,7 @@ public class Download {
     }
 
     // 读取本地哈希表记录找到对应文件块对应的服务器
-    private void getHashTable() {
+    protected void getHashTable() {
         try (ObjectInputStream objectInputStream = new ObjectInputStream(
                 Files.newInputStream(Path.of(hashTableFilePath), StandardOpenOption.READ)
         )) {
@@ -59,12 +59,12 @@ public class Download {
     }
 
     // 获得端口信息
-    private void getPort() {
+    protected void getPort() {
         serverPort.addAll(hash.keySet());
     }
 
     // 获得文件块数
-    private void getChunkCount() {
+    protected void getChunkCount() {
         chunkCount = hash
                 .values()
                 .stream()
@@ -73,7 +73,7 @@ public class Download {
     }
 
     // 合并文件块
-    private void mergeFile() {
+    protected void mergeFile() {
         Path targetFilePath = Paths.get(basePath, fileName + "." + fileExt);
         Path parentDir = targetFilePath.getParent();
         if (parentDir != null && !Files.exists(parentDir)) {
@@ -97,14 +97,16 @@ public class Download {
     }
 
     // 发送文件块名字并接收文件块
-    private void getChunk() {
+    protected void getChunk() {
         List<CompletableFuture<Void>> futures = new ArrayList<>();
 
         // 每个存有文件块的 发送文件名 接收文件块
         for (int port : serverPort) {
             CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
                 try (Socket socket = new Socket(SERVER_HOST, port);
-                     DataOutputStream dataOutputStream = new DataOutputStream(socket.getOutputStream())) {
+                     DataOutputStream dataOutputStream = new DataOutputStream(socket.getOutputStream());
+                     DataInputStream dataInputStream = new DataInputStream(socket.getInputStream())
+                     ) {
 
                     // 发送请求类型
                     dataOutputStream.write(request.getBytes(StandardCharsets.UTF_8));
@@ -120,7 +122,6 @@ public class Download {
                     // 关闭输出流 避免服务器阻塞
                     socket.shutdownOutput();
 
-                    DataInputStream dataInputStream = new DataInputStream(socket.getInputStream());
                     while (true) {
                         int fileNameLength;
                         try {
@@ -147,7 +148,7 @@ public class Download {
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
     }
     // 删除文件块
-    private void deleteChunkFile() {
+    protected void deleteChunkFile() {
         // 循环读取块的过程放入一个线程池中
         ExecutorService executorService = Executors.newFixedThreadPool(chunkCount);
         List<CompletableFuture<Void>> futures = new ArrayList<>();
