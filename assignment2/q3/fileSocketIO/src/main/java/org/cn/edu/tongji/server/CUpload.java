@@ -58,7 +58,6 @@ public class CUpload {
         for (Integer chunkNum: allocatedChunks) {
             String chunkFileName = fileName + chunkNum + "." + fileExt;
             Path filePath = Paths.get(basePath, chunkFileName);
-            System.out.println("检查" + filePath);
             if (!Files.exists(filePath)) {
                 requiredChunkNames.add(chunkFileName);
             }
@@ -66,6 +65,9 @@ public class CUpload {
     }
     // 发送还需要接收的块文件名
     private void sendRequiredChunkName() throws IOException {
+        // 先发送文件名个数
+        dataOutputStream.writeInt(requiredChunkNames.size());
+        // 发送文件名字节数组大小和字节数组
         for (String chunkFileName: requiredChunkNames) {
             byte[] fileNameByte = chunkFileName.getBytes();
             dataOutputStream.writeInt(fileNameByte.length);
@@ -74,22 +76,12 @@ public class CUpload {
     }
     // 接收块文件
     private void getChunk() throws IOException {
-        while (true) {
-            int fileNameLength;
-            try {
-                // 接收文件名长度
-                fileNameLength = dataInputStream.readInt();
-                // 设置超时防止阻塞
-                socket.setSoTimeout(3000);
-                System.out.println("file name length " + fileNameLength);
-            } catch (Exception e) {
-                // 结束接收
-                break;
-            }
-            // 接收并写入文件
+        int fileNameLength;
+        for (int i = 0; i < requiredChunkNames.size(); ++i) {
+            fileNameLength = dataInputStream.readInt();
             ReceiveFile receiveFile = new ReceiveFile(dataInputStream, basePath, fileNameLength);
-            receiveFile.receive();
-            System.out.println("写入成功");
+            receiveFile.receive();;
+            System.out.printf("成功接收");
         }
     }
     public void handleCUpload() throws IOException {

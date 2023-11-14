@@ -62,23 +62,17 @@ public class CUpload extends Upload{
             }
             dataInputStreams[i] = new DataInputStream(sockets[i].getInputStream());
             DataInputStream dataInputStream = dataInputStreams[i];
-//            DataInputStream dataInputStream = new DataInputStream(sockets[i].getInputStream());
             ArrayList<String> requiredChunkFiles = new ArrayList<>();
             // 接收文件名
-            while (true) {
-                try {
-                    int fileNameLength = dataInputStream.readInt();
-                    // 设置超时 防止阻塞
-                    sockets[i].setSoTimeout(3000);
-                    byte[] chunkNameByte = new byte[fileNameLength];
-                    dataInputStream.readFully(chunkNameByte);
-                    String chunkName = new String(chunkNameByte, StandardCharsets.UTF_8);
-                    requiredChunkFiles.add(chunkName);
-                } catch (Exception e) {
-                    break;
-                }
+            int fileNameCount = dataInputStream.readInt();
+            for (int j = 0; j < fileNameCount; ++j) {
+                int fileNameLength = dataInputStream.readInt();
+                byte[] chunkNameByte = new byte[fileNameLength];
+                dataInputStream.readFully(chunkNameByte);
+                String chunkName = new String(chunkNameByte, StandardCharsets.UTF_8);
+                requiredChunkFiles.add(chunkName);
             }
-//            DataOutputStream dataOutputStream = new DataOutputStream(sockets[i].getOutputStream());
+
             dataOutputStreams[i] = new DataOutputStream(sockets[i].getOutputStream());
             DataOutputStream dataOutputStream = dataOutputStreams[i];
             // 发送文件
