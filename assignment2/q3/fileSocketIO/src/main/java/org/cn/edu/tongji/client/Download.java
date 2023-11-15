@@ -4,7 +4,6 @@ import org.cn.edu.tongji.util.ReceiveFile;
 
 import java.io.*;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;

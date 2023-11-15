@@ -52,8 +52,11 @@ public class Main {
                 CDownload.CDownloadFile(fileName);
                 long endTime = System.currentTimeMillis();
                 System.out.println("下载用时: " + (endTime - startTime) + "ms");
-            } else if (command.equals("check")) {
-                System.out.println("CGET!");
+            } else if (command.startsWith("check")) {
+                // 去掉check及其后面的空格
+                String fileName = command.replaceFirst("^check\\s+", "");
+                CheckStatus checkStatus = new CheckStatus(fileName);
+                checkStatus.check();
             } else if (command.equals("q")) {
                 break;
             } else {
