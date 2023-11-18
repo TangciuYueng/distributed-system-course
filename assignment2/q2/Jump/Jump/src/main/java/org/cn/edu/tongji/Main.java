@@ -25,8 +25,8 @@ public class Main {
     private static final int CONNECTION_TIMEOUT_MS = 5000;
 
     public static void main(String[] args) {
-//        String[] seedUrls = {"https://www.tongji.edu.cn", "https://www.pku.edu.cn", "http://www.sina.com.cn", "https://www.mit.edu"};
-        String[] seedUrls = {"https://www.tongji.edu.cn" }; // for test
+        String[] seedUrls = {"https://www.tongji.edu.cn", "https://www.pku.edu.cn", "http://www.sina.com.cn", "https://www.mit.edu"};
+//        String[] seedUrls = {"https://www.tongji.edu.cn" }; // for test
 
         Graph graph = new SingleGraph("WebCrawler");
         Set<String> visitedUrls = new HashSet<>();
@@ -42,7 +42,7 @@ public class Main {
             jumpUrl(seedUrl, graph, visitedUrls, 0);
         }
 
-        // 结束及时
+        // 结束计时
         long endTime = System.currentTimeMillis();
 
         // 打印所需信息
@@ -91,12 +91,14 @@ public class Main {
         viewPanel.getCamera().setViewPercent(viewPanel.getCamera().getViewPercent() * zoomFactor);
     }
 
+    // 打印图信息
     private static void printGraphStats(Graph graph) {
         int nodeCount = graph.getNodeCount();
         int edgeCount = graph.getEdgeCount();
 
         Node maxInDegreeNode = null;
         int maxInDegree = -1;
+        // 找出入度最大的节点
         for (Node node: graph) {
             int inDegree = node.getInDegree();
 
@@ -121,11 +123,11 @@ public class Main {
 
             String host2 = parsedURL2.getHost();
             String[] host2Parts = host2.split("\\.");
-
+            // 不够三个的算作不相同
             if (host1Parts.length < 3 || host2Parts.length < 3) {
                 return false;
             }
-
+            // 检查后三个子域名
             for (int i = 1; i <= 3; ++i) {
                 if (!host1Parts[host1Parts.length - i].equals(host2Parts[host2Parts.length - i])) {
                     return false;
@@ -180,7 +182,7 @@ public class Main {
                 Node node = graph.addNode(linkUrl);
                 node.addAttribute("ui.label", node.getId());
                 graph.addEdge(url + "-" + linkUrl, url, linkUrl, true);
-                System.out.println(url + "->" + linkUrl);
+//                System.out.println(url + "->" + linkUrl);
                 jumpUrl(linkUrl, graph, visitedUrls, hops + 1);
             }
         } catch (IOException e) {
