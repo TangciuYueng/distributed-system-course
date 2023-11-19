@@ -32,7 +32,7 @@ public class CheckStatus {
             try (Socket socket = new Socket(SERVER_HOST, port);
                  DataOutputStream dataOutputStream = new DataOutputStream(socket.getOutputStream());
                  DataInputStream dataInputStream = new DataInputStream(socket.getInputStream())) {
-                System.out.println(SERVER_HOST + ":" + port + "is on");
+                System.out.println(SERVER_HOST + ":" + port + " is on");
                 // send request type
                 dataOutputStream.write(request.getBytes(StandardCharsets.UTF_8));
                 // send the length of file name
@@ -48,7 +48,7 @@ public class CheckStatus {
                 // add v into the hash remote
                 hashRemote.put(port, v);
             } catch (IOException e){
-                System.out.println(SERVER_HOST + ":" + port + "is down");
+                System.out.println(SERVER_HOST + ":" + port + " is down");
             }
         }
         // print remote info
@@ -69,8 +69,19 @@ public class CheckStatus {
     }
 
     private void printRemoteInfo(Map<Integer, List<Integer>> map) {
-        System.out.println("Remote info");
-        printFileInfo(map);
+        boolean allEmpty = true;
+        for (List<Integer> v: map.values()) {
+            if (v.size() > 0) {
+                allEmpty = false;
+                break;
+            }
+        }
+        if (allEmpty) {
+            System.out.println("no remote info");
+        } else {
+            System.out.println("Remote info");
+            printFileInfo(map);
+        }
     }
     private void printLocalInfo(Map<Integer, List<Integer>> map) {
         System.out.println("Local info");

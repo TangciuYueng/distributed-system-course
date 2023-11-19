@@ -40,32 +40,22 @@ public class Upload {
             long fileSize = file.length();
             // number of file chunks
             chunkCount = (int) Math.ceil((double) fileSize / CHUNK_SIZE);
-            // get the thread pool
-            ExecutorService executorService = Executors.newFixedThreadPool(chunkCount);
-            List<CompletableFuture<Void>> futures = new ArrayList<>();
 
             // get file chunks
             for (int i = 0; i < chunkCount; ++i) {
                 int chunkIndex = i;
-                // async dealing
-                CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
-                    // test.txt -> test.txt$0/test.txt$1...
-                    String chunkFilePath = BASE_CHUNK_FILE_PATH + fileName + "$" + chunkIndex;
-                    try (RandomAccessFile chunkFile = new RandomAccessFile(chunkFilePath, "rw");
-                         FileChannel chunkFileChannel = chunkFile.getChannel()) {
-                        long position = (long) chunkIndex * CHUNK_SIZE;
-                        long remaining = fileSize - position;
-                        long chunkSize = Math.min(CHUNK_SIZE, remaining);
-                        fileChannel.transferTo(position, chunkSize, chunkFileChannel);
-                    } catch (Exception e) {
-                        System.out.println(chunkFilePath + " error");
-                    }
-                }, executorService);
-                futures.add(future);
+                // test.txt -> test.txt$0/test.txt$1...
+                String chunkFilePath = BASE_CHUNK_FILE_PATH + fileName + "$" + chunkIndex;
+                try (RandomAccessFile chunkFile = new RandomAccessFile(chunkFilePath, "rw");
+                     FileChannel chunkFileChannel = chunkFile.getChannel()) {
+                    long position = (long) chunkIndex * CHUNK_SIZE;
+                    long remaining = fileSize - position;
+                    long chunkSize = Math.min(CHUNK_SIZE, remaining);
+                    fileChannel.transferTo(position, chunkSize, chunkFileChannel);
+                } catch (Exception e) {
+                    System.out.println(chunkFilePath + " error");
+                }
             }
-            // close the thread pool after waiting all the thread complete
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-            executorService.shutdown();
 
         } catch (Exception e) {
             System.out.println(filePath + " error");
@@ -112,6 +102,7 @@ public class Upload {
     protected void sendChunk() {
         Socket[] sockets = new Socket[SERVER_PORTS.length];
         DataOutputStream[] dataOutputStreams = new DataOutputStream[SERVER_PORTS.length];
+        DataInputStream[] dataInputStreams = new DataInputStream[SERVER_PORTS.length];
         try {
             for (int i = 0; i < sockets.length; ++i) {
                 // this one is not allocated
@@ -121,6 +112,7 @@ public class Upload {
                 // apply for connection
                 sockets[i] = new Socket(SERVER_HOST, SERVER_PORTS[i]);
                 dataOutputStreams[i] = new DataOutputStream(sockets[i].getOutputStream());
+                dataInputStreams[i] = new DataInputStream(sockets[i].getInputStream());
                 // send the request type
                 dataOutputStreams[i].write(request.getBytes(StandardCharsets.UTF_8));
                 // send file name length
@@ -140,7 +132,9 @@ public class Upload {
                         dataOutputStreams[i] = new DataOutputStream(sockets[i].getOutputStream());
                         SendFile sendFile = new SendFile(fileName + "$" + j, fileChannel, dataOutputStreams[i]);
                         sendFile.send();
-                        System.out.println(chunkFilePath + " is uploaded successfully");
+                        // get successful flag
+                        dataInputStreams[i].readInt();
+//                        System.out.println(chunkFilePath + " is uploaded successfully");
                     } catch (IOException e) {
                         System.out.println(filePath + " error");
                     }
@@ -164,6 +158,13 @@ public class Upload {
                         System.out.println(dataOutputStreams[i] + " close failed");
                     }
                 }
+                if (dataInputStreams[i] != null) {
+                    try {
+                        dataInputStreams[i].close();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
             }
         }
     }
@@ -184,7 +185,7 @@ public class Upload {
         }
     }
 
-    public static void UploadFile(String filePath) {
+    public static void uploadFile(String filePath) {
         Upload upload = new Upload(filePath);
         upload.getChunk();
         upload.allocateChunk();
@@ -194,7 +195,7 @@ public class Upload {
     }
 
     public static void main(String[] args) {
-        Upload upload = new Upload("./test.txt");
+        Upload upload = new Upload("./test.pdf");
         upload.getChunk();
         upload.allocateChunk();
         upload.sendChunk();

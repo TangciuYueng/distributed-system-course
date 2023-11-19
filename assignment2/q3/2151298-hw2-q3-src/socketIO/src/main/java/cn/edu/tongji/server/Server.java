@@ -70,6 +70,8 @@ public class Server implements Runnable {
             try (FileChannel fileChannel = FileChannel.open(chunkFilePath, StandardOpenOption.READ)) {
                 SendFile sendFile = new SendFile(chunkFileName, fileChannel, dataOutputStream);
                 sendFile.send();
+                // get successful flag
+                dataInputStream.readInt();
                 System.out.println(chunkFilePath + " is sent successfully");
             } catch (IOException e) {
                 System.out.println(chunkFilePath + " open error");
@@ -121,7 +123,7 @@ public class Server implements Runnable {
         String fileName = getFileName(dataInputStream);
 
         // state a set for chunk index given
-        Set<Integer> chunkIndex = new HashSet<>();
+//        Set<Integer> chunkIndex = new HashSet<>();
 
         // get the number of the file names
         int fileNameCount = dataInputStream.readInt();
@@ -131,11 +133,36 @@ public class Server implements Runnable {
             int fileNameLength = dataInputStream.readInt();
             // get the content of the file
             ReceiveFile receiveFile = new ReceiveFile(fileNameLength, basePath, dataInputStream);
-            chunkIndex.add(receiveFile.receive());
+            // add into the chunk index set
+//            chunkIndex.add(receiveFile.receive());
+            int chunkIndex = receiveFile.receive();
+            // get one save one
+            saveChunkIndex(basePath, fileName + ".ser", chunkIndex);
+            // send successful flag
+            dataOutputStream.writeInt(0);
         }
 
         // save the file chunk index set
-        saveSet(basePath, fileName + ".ser", chunkIndex);
+//        saveSet(basePath, fileName + ".ser", chunkIndex);
+    }
+
+    private void saveChunkIndex(String basePath, String fileName, int chunkIndex) throws IOException {
+        // create the folder if not exists
+        Path filePath = Paths.get(basePath, fileName);
+        Path parentDir = filePath.getParent();
+        if (parentDir != null && !Files.exists(parentDir)) {
+            Files.createDirectories(parentDir);
+        }
+        // check if the file exists
+        if (!Files.exists(filePath)) {
+            // if the file doesn't exist, create a new file and write the chunkIndex
+            String chunkIndexLine = chunkIndex + System.lineSeparator();
+            Files.write(filePath, chunkIndexLine.getBytes(), StandardOpenOption.CREATE);
+        } else {
+            // if the file exists, append the chunkIndex
+            String chunkIndexLine = chunkIndex + System.lineSeparator();
+            Files.write(filePath, chunkIndexLine.getBytes(), StandardOpenOption.APPEND);
+        }
     }
 
     private void saveSet(String basePath, String fileName, Set<Integer> chunkIndex) throws IOException {
@@ -145,6 +172,11 @@ public class Server implements Runnable {
         if (parentDir != null && !Files.exists(parentDir)) {
             Files.createDirectories(parentDir);
         }
+        // get the set xxx.ser first
+        Set<Integer> chunkIndexOrigin = getChunkSet(basePath, fileName);
+        // get the union
+        chunkIndex.addAll(chunkIndexOrigin);
+        System.out.println("after union " + chunkIndex);
         // save the set into the local file xxx.ser
         Files.write(filePath, chunkIndex.stream().map(Object::toString).toList());
         System.out.println("mapping table is saved successfully " + chunkIndex);

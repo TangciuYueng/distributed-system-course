@@ -12,12 +12,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.time.chrono.IsoEra;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Download {
@@ -34,41 +28,34 @@ public class Download {
         this.basePath = "files_download";
     }
     protected void getChunk() {
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
         for (int port: SERVER_PORTS) {
-            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
-                try (Socket socket = new Socket(SERVER_HOST, port);
-                        DataOutputStream dataOutputStream = new DataOutputStream(socket.getOutputStream());
-                        DataInputStream dataInputStream = new DataInputStream(socket.getInputStream())) {
-                    // sent request type
-                    dataOutputStream.write(request.getBytes(StandardCharsets.UTF_8));
-                    // sent requested file name
-                    byte[] fileNameByte = fileName.getBytes(StandardCharsets.UTF_8);
-                    dataOutputStream.writeInt(fileNameByte.length);
-                    dataOutputStream.write(fileNameByte);
+            try (Socket socket = new Socket(SERVER_HOST, port);
+                    DataOutputStream dataOutputStream = new DataOutputStream(socket.getOutputStream());
+                    DataInputStream dataInputStream = new DataInputStream(socket.getInputStream())) {
+                // sent request type
+                dataOutputStream.write(request.getBytes(StandardCharsets.UTF_8));
+                // sent requested file name
+                byte[] fileNameByte = fileName.getBytes(StandardCharsets.UTF_8);
+                dataOutputStream.writeInt(fileNameByte.length);
+                dataOutputStream.write(fileNameByte);
 
-                    // get the number of file chunks, just for this port
-                    int chunkFileCount = dataInputStream.readInt();
-                    // get the number of total chunks
-                    chunkCount.addAndGet(chunkFileCount);
-                    // get each file chunk
-                    for (int i = 0; i < chunkFileCount; ++i) {
-                        // get the length of each file name
-                        int fileNameLength = dataInputStream.readInt();
-                        // get the content of the file
-                        ReceiveFile receiveFile = new ReceiveFile(fileNameLength, basePath, dataInputStream);
-                        receiveFile.receive();
-                    }
-
-                } catch (Exception e) {
-                    System.out.println(port + " connected failed");
+                // get the number of file chunks, just for this port
+                int chunkFileCount = dataInputStream.readInt();
+                // get the number of total chunks
+                chunkCount.addAndGet(chunkFileCount);
+                // get each file chunk
+                for (int i = 0; i < chunkFileCount; ++i) {
+                    // get the length of each file name
+                    int fileNameLength = dataInputStream.readInt();
+                    // get the content of the file
+                    ReceiveFile receiveFile = new ReceiveFile(fileNameLength, basePath, dataInputStream);
+                    receiveFile.receive();
                 }
-            });
 
-            futures.add(future);
+            } catch (Exception e) {
+                System.out.println(port + " connected failed");
+            }
         }
-        // waiting for all the thread completion
-        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
     }
     protected void mergeFile() {
         Path targetFilePath = Paths.get(basePath, fileName);
@@ -92,33 +79,23 @@ public class Download {
             }
             System.out.println(fileName + " download successfully, check the folder files_download");
         } catch (IOException e) {
+            e.printStackTrace();
             System.out.println("create target file failed");
         }
     }
     protected void deleteChunkFile() {
-        // get the thread pool
-        ExecutorService executorService = Executors.newFixedThreadPool(chunkCount.get());
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
-
         for (int i = 0; i < chunkCount.get(); ++i) {
             int chunkIndex = i;
-            // async dealing
-            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
-                // delete temp file chunks
-                Path chunkFilePath = Paths.get(basePath, fileName + "$" + chunkIndex);
-                if (Files.exists(chunkFilePath)) {
-                    try {
-                        Files.delete(chunkFilePath);
-                    } catch (IOException e) {
-                        System.out.println(chunkFilePath + "deleted failed");
-                    }
+            // delete temp file chunks
+            Path chunkFilePath = Paths.get(basePath, fileName + "$" + chunkIndex);
+            if (Files.exists(chunkFilePath)) {
+                try {
+                    Files.delete(chunkFilePath);
+                } catch (IOException e) {
+                    System.out.println(chunkFilePath + "deleted failed");
                 }
-            }, executorService);
-            futures.add(future);
+            }
         }
-        // close the thread pool after waiting all the thread complete
-        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-        executorService.shutdown();
     }
 
     protected boolean fileExists() {
@@ -137,7 +114,7 @@ public class Download {
     }
 
     public static void main(String[] args) {
-        Download download = new Download("test.txt");
+        Download download = new Download("test.pdf");
         download.getChunk();
         if (download.fileExists()) {
             download.mergeFile();

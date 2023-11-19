@@ -38,6 +38,7 @@ public class CUpload extends Upload {
     protected void sendChunk() {
         Socket[] sockets = new Socket[SERVER_PORTS.length];
         DataOutputStream[] dataOutputStreams = new DataOutputStream[SERVER_PORTS.length];
+        DataInputStream[] dataInputStreams = new DataInputStream[SERVER_PORTS.length];
         try {
             for (int i = 0; i < sockets.length; ++i) {
                 // this one is not allocated
@@ -75,8 +76,12 @@ public class CUpload extends Upload {
                     // send file
                     try (FileChannel fileChannel = FileChannel.open(Paths.get(chunkFilePath), StandardOpenOption.READ)) {
                         dataOutputStreams[i] = new DataOutputStream(sockets[i].getOutputStream());
+                        dataInputStreams[i] = new DataInputStream(sockets[i].getInputStream());
                         SendFile sendFile = new SendFile(fileName + "$" + j, fileChannel, dataOutputStreams[i]);
                         sendFile.send();
+                        // get the successful sending flag
+                        sockets[i].setSoTimeout(500);
+                        dataInputStreams[i].readInt();
                         System.out.println(chunkFilePath + " is uploaded successfully");
                         // after sending successfully add j into hash table that record sent chunk number
                         if (hashSent.containsKey(SERVER_PORTS[i])) {
@@ -87,7 +92,8 @@ public class CUpload extends Upload {
                             hashSent.put(SERVER_PORTS[i], new ArrayList<>(List.of(j)));
                         }
                     } catch (IOException e) {
-                        System.out.println(filePath + " error");
+                        System.out.println(chunkFilePath + " error");
+                        break;
                     }
 //                    System.out.println("hashSent " + hashSent);
                 }
@@ -131,11 +137,21 @@ public class CUpload extends Upload {
         try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(
                 Files.newOutputStream(path, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
         )) {
-            objectOutputStream.writeObject(hash);
-//            System.out.println("hash table sent saved successfully");
+            objectOutputStream.writeObject(hashSent);
+            System.out.println("hash table sent saved successfully");
         } catch (IOException e) {
             System.out.println("hash table sent saved failed");
         }
+    }
+
+    public static void uploadFile(String filePath) {
+        CUpload cUpload = new CUpload(filePath);
+        cUpload.getChunk();
+        cUpload.getHashTable();
+        cUpload.sendChunk();
+        cUpload.deleteChunkFile();
+        cUpload.saveHashtable();
+        cUpload.saveHashSent();
     }
 
     public static void main(String[] args) {

@@ -16,9 +16,9 @@ public class Main {
                 // get rid of the put and backspace after it
                 String filePath = command.replaceFirst("^put\\s+", "");
                 if (isFilePath(filePath)) {
-                    System.out.println(filePath + "will be uploaded");
+                    System.out.println(filePath + " will be uploaded");
                     long startTime = System.currentTimeMillis();
-                    Upload.UploadFile(filePath);
+                    Upload.uploadFile(filePath);
                     long endTime = System.currentTimeMillis();
                     System.out.println("duration: " + (endTime - startTime) + "ms");
                 } else {
@@ -36,7 +36,7 @@ public class Main {
                 String filePath = command.replaceFirst("^cput\\s+", "");
                 if (isFilePath(filePath)) {
                     long startTime = System.currentTimeMillis();
-                    CUpload.UploadFile(filePath);
+                    CUpload.uploadFile(filePath);
                     long endTime = System.currentTimeMillis();
                     System.out.println("duration: " + (endTime - startTime) + "ms");
                 } else {
