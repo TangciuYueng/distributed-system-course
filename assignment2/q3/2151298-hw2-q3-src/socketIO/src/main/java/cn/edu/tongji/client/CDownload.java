@@ -4,10 +4,8 @@ import cn.edu.tongji.util.ReceiveFile;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,7 +28,7 @@ public class CDownload extends Download {
 
     @Override
     protected void getChunk() {
-        System.out.println("require hash" + hashRequiredChunk);
+//        System.out.println("require hash" + hashRequiredChunk);
         List<CompletableFuture<Void>> futures = new ArrayList<>();
         for (int port: SERVER_PORTS) {
             CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
@@ -90,7 +88,7 @@ public class CDownload extends Download {
                         vTemp.add(chunkIndex);
                         hashRequiredChunk.put(port, vTemp);
                     } else {
-                        hashRequiredChunk.put(port, Arrays.asList(chunkIndex));
+                        hashRequiredChunk.put(port, new ArrayList<>(List.of(chunkIndex)));
                     }
                 }
             }
@@ -105,14 +103,14 @@ public class CDownload extends Download {
         } catch (Exception e) {
             System.out.println("no ser file error");
         }
-        System.out.println("hash " + hash);
+//        System.out.println("hash " + hash);
     }
 
     @Override
     protected boolean fileExists() {
         // get chunk count
         for (List<Integer> v: hash.values()) {
-            chunkCount += v.size();
+            chunkCount.addAndGet(v.size());
         }
         for (List<Integer> v: hashRequiredChunk.values()) {
             for (Integer chunkIndex: v) {
@@ -138,7 +136,7 @@ public class CDownload extends Download {
         }
     }
     public static void main(String[] args) {
-        CDownload cDownload = new CDownload("test.txt");
+        CDownload cDownload = new CDownload("test.pdf");
         cDownload.getHashTable();
         cDownload.getRequiredChunk();
         cDownload.getChunk();

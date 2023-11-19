@@ -31,11 +31,26 @@ public class Server implements Runnable {
         requestHandles.put('D', this::handleDownload);
         requestHandles.put('P', this::handleCUpload);
         requestHandles.put('G', this::handleCDownload);
+        requestHandles.put('C', this::handleCheck);
     }
 
     @FunctionalInterface
     interface RequestHandler {
         void handle(DataInputStream dataInputStream, DataOutputStream dataOutputStream) throws Exception;
+    }
+
+    private void handleCheck(DataInputStream dataInputStream, DataOutputStream dataOutputStream) throws IOException {
+        // get the file name
+        String fileName = getFileName(dataInputStream);
+        // get the file chunk set
+        Set<Integer> chunkIndex = getChunkSet(basePath, fileName + ".ser");
+        System.out.println("get the set " + chunkIndex);
+        // send the number of the file chunks
+        dataOutputStream.writeInt(chunkIndex.size());
+        // send each file chunk index
+        for (int index: chunkIndex) {
+            dataOutputStream.writeInt(index);
+        }
     }
 
     private void handleCDownload(DataInputStream dataInputStream, DataOutputStream dataOutputStream) throws IOException {

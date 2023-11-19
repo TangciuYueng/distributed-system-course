@@ -9,7 +9,7 @@ public class Main {
     public static void main(String[] args) {
         while (true) {
             Scanner scanner = new Scanner(System.in);
-            System.out.println("enter the command");
+            System.out.println("\nenter the command plz");
             String command = scanner.nextLine();
 
             if (command.startsWith("put")) {

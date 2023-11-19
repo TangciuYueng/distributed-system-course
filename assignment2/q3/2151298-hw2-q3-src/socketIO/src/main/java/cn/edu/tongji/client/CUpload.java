@@ -84,12 +84,12 @@ public class CUpload extends Upload {
                             vTemp.add(j);
                             hashSent.put(SERVER_PORTS[i], vTemp);
                         } else {
-                            hashSent.put(SERVER_PORTS[i], Arrays.asList(j));
+                            hashSent.put(SERVER_PORTS[i], new ArrayList<>(List.of(j)));
                         }
                     } catch (IOException e) {
                         System.out.println(filePath + " error");
                     }
-                    System.out.println("hashSent " + hashSent);
+//                    System.out.println("hashSent " + hashSent);
                 }
             }
         } catch (IOException e) {
@@ -139,7 +139,7 @@ public class CUpload extends Upload {
     }
 
     public static void main(String[] args) {
-        CUpload cUpload = new CUpload("./test.txt");
+        CUpload cUpload = new CUpload("./test.pdf");
         cUpload.getChunk();
         cUpload.getHashTable();
         cUpload.sendChunk();

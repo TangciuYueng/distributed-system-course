@@ -6,7 +6,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -19,11 +18,13 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Download {
     protected final String fileName;
     protected final String basePath;
-    protected int chunkCount;
+//    protected int chunkCount;
+    protected AtomicInteger chunkCount = new  AtomicInteger(0);
     protected static int[] SERVER_PORTS = {8887, 8888, 8889};
     private static final String request = "D";
     protected static final String SERVER_HOST = "localhost";
@@ -49,7 +50,7 @@ public class Download {
                     // get the number of file chunks, just for this port
                     int chunkFileCount = dataInputStream.readInt();
                     // get the number of total chunks
-                    chunkCount += chunkFileCount;
+                    chunkCount.addAndGet(chunkFileCount);
                     // get each file chunk
                     for (int i = 0; i < chunkFileCount; ++i) {
                         // get the length of each file name
@@ -82,7 +83,7 @@ public class Download {
         }
         // merge file chunks
         try (FileChannel fileChannel = FileChannel.open(targetFilePath, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
-            for (int i = 0; i < chunkCount; ++i) {
+            for (int i = 0; i < chunkCount.get(); ++i) {
                 Path chunkFilePath = Paths.get(basePath, fileName + "$" + i);
                 try (FileChannel chunkFileChannel = FileChannel.open(chunkFilePath, StandardOpenOption.READ)) {
                     fileChannel.position(fileChannel.size());
@@ -96,10 +97,10 @@ public class Download {
     }
     protected void deleteChunkFile() {
         // get the thread pool
-        ExecutorService executorService = Executors.newFixedThreadPool(chunkCount);
+        ExecutorService executorService = Executors.newFixedThreadPool(chunkCount.get());
         List<CompletableFuture<Void>> futures = new ArrayList<>();
 
-        for (int i = 0; i < chunkCount; ++i) {
+        for (int i = 0; i < chunkCount.get(); ++i) {
             int chunkIndex = i;
             // async dealing
             CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
@@ -121,7 +122,7 @@ public class Download {
     }
 
     protected boolean fileExists() {
-        return chunkCount > 0;
+        return chunkCount.get() > 0;
     }
 
     public static void downloadFile(String fileName) {

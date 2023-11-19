@@ -1,7 +1,7 @@
 *.dat
 *.txt*
 *.ser
-test*.pdf
+test*.pdf*
 
 target/
 !.mvn/wrapper/maven-wrapper.jar

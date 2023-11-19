@@ -55,6 +55,16 @@ public class ReceiveFile {
                 ByteBuffer byteBuffer = ByteBuffer.wrap(buffer, 0, bytesRead);
                 fileChannel.write(byteBuffer);
             }
+        } catch (Exception e) {
+            System.out.println("receive file chunk failed " + filePath);
+            // sth goes wrong then delete the destroyed file chunk
+            try {
+                Files.deleteIfExists(filePath);
+            } catch (IOException ex) {
+                System.out.println("destroyed file delete failed " + filePath);
+            }
+            // further propagation of the exception info
+            throw e;
         }
 
         // extract the chunk index from the file name
