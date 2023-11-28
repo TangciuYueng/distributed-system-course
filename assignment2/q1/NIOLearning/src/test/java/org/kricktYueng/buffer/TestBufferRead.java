@@ -1,4 +1,4 @@
-package org.kricktYueng;
+package org.kricktYueng.buffer;
 
 import java.nio.ByteBuffer;
 

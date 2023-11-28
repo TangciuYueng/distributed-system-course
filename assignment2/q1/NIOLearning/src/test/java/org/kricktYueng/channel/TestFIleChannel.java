@@ -1,4 +1,4 @@
-package org.kricktYueng;
+package org.kricktYueng.channel;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
