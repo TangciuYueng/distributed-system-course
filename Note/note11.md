@@ -258,7 +258,7 @@ Tolerating a faulty process的关键方法是将**多个相同的流程组织成
 
 这需要对一个流程组应用一种协议来达成一致。通过组织多个相同的流程成为一个组，并使用一种协议来确保在组内出现故障时仍然能够满足系统规格要求，从而实现k-容错系统的目标。
 
-### Agreement in Faulty Systems
+#### Agreement in Faulty Systems
 在一个流程组中，通常需要达成以下方面的协议一致：
 - 选举coordinator
 - 决定是否提交事务commit a transaction
@@ -280,3 +280,11 @@ Tolerating a faulty process的关键方法是将**多个相同的流程组织成
 
 在以下情况下才可能达成一致
 ![](./ref/note11-8.PNG)
+
+在实践中，大多数分布式系统假设：
+- 进程是异步的
+- 消息传输是单播的
+- 通信延迟没有界限
+- 通常需要使用有序（可靠）的消息传递
+- 协议达成一致问题最初由Lamport研究，被称为拜占庭协议问题[Lamport et al.]。
+
