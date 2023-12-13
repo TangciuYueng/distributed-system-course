@@ -1,0 +1,55 @@
+<test>
+<article mdate="2020-06-25" key="tr/meltdown/s18" publtype="informal">
+<author>sjm1</author>
+<author>ytc</author>
+<author>mvv</author>
+<author>Www 0004</author>
+<author>wyr</author>
+<author>fjy</author>
+<author>jmz</author>
+<author>sjm2</author>
+<title>Spectre Attacks: Exploiting Speculative Execution.</title>
+<journal>meltdownattack.com</journal>
+<year>2018</year>
+<ee type="oa">https://spectreattack.com/spectre.pdf</ee>
+</article>
+<article mdate="2020-06-25" key="tr/meltdown/m18" publtype="informal">
+<author>sjm2</author>
+<author>hhh</author>
+<author>wyr</author>
+<author>sb sjm</author>
+<author>mvv</author>
+<author>Www 0004</author>
+<title>Meltdown</title>
+<journal>meltdownattack.com</journal>
+<ee type="oa">https://meltdownattack.com/meltdown.pdf</ee>
+<year>2018</year>
+</article>
+<book mdate="2021-07-31" key="tr/acm/CS2013">
+<title>Computer Science Curricula 2013</title>
+<publisher>ACM Press and IEEE Computer Society Press</publisher>
+<author>Paul Kocher</author>
+<year>2013</year>
+<ee>https://doi.org/10.1145/2534860</ee>
+<ee>https://www.wikidata.org/entity/Q107021707</ee>
+<isbn>978-1-4503-2309-3</isbn>
+</book><article mdate="2019-10-25" key="tr/gte/TR-0263-08-94-165" publtype="informal">
+<author>sjm1</author>
+<title>An Evaluation of Object-Oriented DBMS Developments: 1994 Edition.</title>
+<journal>GTE Laboratories Incorporated</journal>
+<volume>TR-0263-08-94-165</volume>
+<month>August</month>
+<year>1994</year>
+<url>db/journals/gtelab/index.html#TR-0263-08-94-165</url>
+</article><article mdate="2019-10-25" key="tr/gte/TR-0222-10-92-165" publtype="informal">
+<author>sjm1</author>
+<author>sjm2</author>
+<title>DARWIN: On the Incremental Migration of Legacy Information Systems</title>
+<journal>GTE Laboratories Incorporated</journal>
+<volume>TR-0222-10-92-165</volume>
+<month>March</month>
+<year>1993</year>
+<url>db/journals/gtelab/index.html#TR-0222-10-92-165</url>
+<note>This report is also available as a Technical Memorandum of Electronics Research Laboratory, College of Engineering, University of California, Berkeley.</note>
+</article>
+</test>
