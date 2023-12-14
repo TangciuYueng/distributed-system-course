@@ -3,6 +3,7 @@
 *.ser
 test*.pdf*
 *.json
+*.bson
 
 target/
 !.mvn/wrapper/maven-wrapper.jar
