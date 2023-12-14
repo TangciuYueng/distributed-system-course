@@ -1,30 +1,49 @@
 import json
-import os
+import math
+import sys
 
-def split_json(input_file, output_folder, output_file_count):
-    with open(input_file, 'r', encoding='utf-8') as file:
-        data = json.load(file)
+def read_json(file_path):
+    try:
+        with open(file_path, 'r') as file:
+            data = json.load(file)
+        return data
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+        sys.exit(1)
+    except json.JSONDecodeError:
+        print(f"Error decoding JSON in file: {file_path}")
+        sys.exit(1)
 
-    total_objects = len(data)
-    objects_per_file = total_objects // output_file_count
-    remaining_objects = total_objects % output_file_count
+def write_json(file_path, data):
+    with open(file_path, 'w') as file:
+        json.dump(data, file, indent=2)
 
-    # Ensure the output folder exists
-    os.makedirs(output_folder, exist_ok=True)
+def split_json(data, num_blocks):
+    total_entries = len(data)
+    entries_per_block = math.ceil(total_entries / num_blocks)
 
-    start_index = 0
-    for i in range(output_file_count):
-        end_index = start_index + objects_per_file + (1 if i < remaining_objects else 0)
-        output_file = os.path.join(output_folder, f'output_{i + 1}.json')
+    blocks = [{} for _ in range(num_blocks)]
+    current_block = 0
 
-        with open(output_file, 'w', encoding='utf-8') as file:
-            json.dump(data[start_index:end_index], file, ensure_ascii=False, indent=2)
+    for key, value in data.items():
+        blocks[current_block][key] = value
+        current_block = (current_block + 1) % num_blocks
 
-        start_index = end_index
+    return blocks
 
 if __name__ == "__main__":
-    input_file = "path/to/your/input.json"
-    output_folder = "path/to/your/output_folder"
-    output_file_count = 4
+    if len(sys.argv) != 4:
+        print("Usage: python script.py <input_file_path> <output_directory> <num_blocks>")
+        sys.exit(1)
 
-    split_json(input_file, output_folder, output_file_count)
+    input_file_path = sys.argv[1]
+    output_directory = sys.argv[2]
+    num_blocks = int(sys.argv[3])
+
+    json_data = read_json(input_file_path)
+    json_blocks = split_json(json_data, num_blocks)
+
+    for i, block in enumerate(json_blocks):
+        output_file_path = f"{output_directory}/block_{i + 1}.json"
+        write_json(output_file_path, block)
+        print(f"Block {i + 1} written to {output_file_path}")

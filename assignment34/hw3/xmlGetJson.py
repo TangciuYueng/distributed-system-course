@@ -6,7 +6,7 @@ data={}
 dir_path = 'E:\\xx\\distributed_system\\assignment34\\hw3'
 file_path='E:\\xx\\distributed_system\\assignment34\\hw3\\test.xml'
 
-with open(file_path, 'r') as f:
+with open(file_path, 'r', encoding='utf-8') as f:
     author=[]
     for line in f.readlines():
         if "key=" in line:
@@ -35,11 +35,11 @@ with open(file_path, 'r') as f:
     print(json_data)
 
     file_name_without_extension = os.path.splitext(f.name)[0]
-    new_file_path = os.path.join(dir_path, file_name_without_extension + '-0.json')
+    new_file_path = os.path.join(dir_path, file_name_without_extension + '.json')
 
     f2=open(new_file_path, 'w')
     f2.write(json_data)
     f2.close()
 
-    print(f +" complete preprocess!")
+    print(f.name +" complete preprocess!")
 

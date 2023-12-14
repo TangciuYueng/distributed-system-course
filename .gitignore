@@ -2,6 +2,7 @@
 *.txt*
 *.ser
 test*.pdf*
+*.json
 
 target/
 !.mvn/wrapper/maven-wrapper.jar
