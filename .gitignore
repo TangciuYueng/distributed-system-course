@@ -4,6 +4,7 @@
 test*.pdf*
 *.json
 *.bson
+*.lson
 
 target/
 !.mvn/wrapper/maven-wrapper.jar

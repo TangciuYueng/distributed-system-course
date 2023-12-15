@@ -40,6 +40,14 @@ with open(file_path, 'r', encoding='utf-8') as f:
     f2=open(new_file_path, 'w')
     f2.write(json_data)
     f2.close()
+    
+    new_file_path = os.path.join(dir_path, file_name_without_extension + '_line' + '.lson')
+
+    with open(new_file_path, 'w') as f3:
+        for key, value in data.items():
+            # 将每个键值对作为一个 JSON 对象写入文件，每行一个对象
+            json_line = json.dumps({key: value}, indent=None, separators=(',', ': '))
+            f3.write(json_line + '\n')
 
     print(f.name +" complete preprocess!")
 
