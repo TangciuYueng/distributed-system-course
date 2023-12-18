@@ -1,6 +1,7 @@
 package cn.edu.tongji.tools;
 
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Scanner;
 
@@ -15,13 +16,20 @@ public class CreateIndex {
     }
 
     public static void main(String[] args) {
-//        Scanner sc = new Scanner(System.in);
-//        String filePath = sc.nextLine();
-        String filePath = "D:\\大学学习资料\\大三上学期学习\\分布式系统\\作业\\dblp.xml\\dblp_line.lson";
+        Scanner sc = new Scanner(System.in);
+        String filePath = sc.nextLine();
+//        String filePath = "D:\\大学学习资料\\大三上学期学习\\分布式系统\\作业\\dblp.xml\\dblp_line.lson";
 
         PersistentBTree bTree = createPersistentBTree(filePath);
 //        bTree.output();
-        String fileName = "dbpl_data.ser";
+
+        // 获取文件名
+        String fileNameWithExtension = Paths.get(filePath).getFileName().toString();
+
+        // 获取没有后缀的文件名
+        String fileNameWithoutExtension = getFileNameWithoutExtension(fileNameWithExtension);
+
+        String fileName = fileNameWithoutExtension + "_index_tree.ser";
         try {
             bTree.saveToFile(fileName);
             System.out.println("success!");
@@ -37,5 +45,10 @@ public class CreateIndex {
             bTree.insert(entry.getKey(), entry.getValue());
         }
         return bTree;
+    }
+
+    private static String getFileNameWithoutExtension(String fileName) {
+        int dotIndex = fileName.lastIndexOf('.');
+        return (dotIndex == -1) ? fileName : fileName.substring(0, dotIndex);
     }
 }

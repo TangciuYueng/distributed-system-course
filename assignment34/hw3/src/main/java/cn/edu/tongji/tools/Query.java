@@ -6,13 +6,18 @@ import java.io.IOException;
 import java.util.Scanner;
 
 public class Query {
-    private static final String FILE_NAME = "dbpl_data.ser";
-    private static final String DATA_FILE_PATH = "dblp_line.lson";
+    private static final String FILE_NAME = "dblp_line_processed_chunk_1";
+    private static final String DATA_FILE_PATH = "dblp_line_processed_chunk_1_bucket_";
 
     public static void main(String[] args) {
         try {
-            PersistentBTree<String, Long> loadedBTree = PersistentBTree.loadFromFile(FILE_NAME);
-            System.out.println("BTree loaded from file:");
+            PersistentBTree<String, Long>[] trees = new PersistentBTree[4];
+            long startTime = System.nanoTime();
+            for (int i = 0; i < 4; ++i) {
+                trees[i] = PersistentBTree.loadFromFile(FILE_NAME + "_bucket_" + i + "_index_tree.ser");
+            }
+            long endTime = System.nanoTime();
+            System.out.println("读取index文件用时： " + (endTime - startTime) / 1_000_000);
 
             try (Scanner sc = new Scanner(System.in)) {
                 while (true) {
@@ -22,15 +27,21 @@ public class Query {
                         break;
                     }
 
-                    Long pointer = loadedBTree.search(name);
+                    int hashResult = customHashFunction(name) % 4;
+
+                    Long pointer = trees[hashResult].search(name);
                     if (pointer != null) {
-                        try (BufferedReader reader = new BufferedReader(new FileReader(DATA_FILE_PATH))) {
+                        startTime = System.nanoTime();
+                        try (BufferedReader reader = new BufferedReader(new FileReader(DATA_FILE_PATH + hashResult + ".lson"))) {
                             reader.skip(pointer);
                             String jsonData = reader.readLine();
                             System.out.println(jsonData);
                         } catch (IOException e) {
                             System.out.println("Failed to read data file: " + e.getMessage());
                         }
+                        endTime = System.nanoTime();
+                        System.out.println("本次查询用时： " + (endTime - startTime) / 1_000_000);
+
                     } else {
                         System.out.println("Name not found");
                     }
@@ -39,5 +50,18 @@ public class Query {
         } catch (IOException | ClassNotFoundException e) {
             System.err.println("Failed to load BTree from file: " + e.getMessage());
         }
+    }
+
+    public static int customHashFunction(String name) {
+        // 初始化哈希值
+        int hashValue = 0;
+
+        // 遍历姓名中的每个字符
+        for (char ch : name.toCharArray()) {
+            // 将字符的Unicode码值加到哈希值中
+            hashValue += (int) ch;
+        }
+
+        return hashValue;
     }
 }

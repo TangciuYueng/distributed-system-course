@@ -1,5 +1,6 @@
 import sys
 import os
+import json
 
 def custom_hash_function(name):
     # 初始化哈希值
@@ -26,7 +27,7 @@ class HashBuffer:
     def flush_buffer(self):
         with open(self.filename, 'a') as f:
             for item in self.buffer:
-                f.write(item)
+                f.write(json.dumps(item)+"\n")
             self.buffer = []
 
 def main():
@@ -46,7 +47,7 @@ def main():
     with open(file_path, 'r') as f:
         for line in f:
             # 解析原始数据
-            data = eval(line)
+            data = json.loads(line)
             name = list(data.keys())[0]
             values = data[name]
 
@@ -61,7 +62,7 @@ def main():
             # print(name, buffer_index)
 
             # 将元数据添加到对应的缓冲区中
-            buffers[buffer_index].add_to_buffer(f'{name}: {values}\n')
+            buffers[buffer_index].add_to_buffer(data)
 
     # 将缓冲区中剩余的数据写入数据文件
     for buffer in buffers:
