@@ -38,6 +38,10 @@ def process_json_file(file_path):
     merged_data = merge_json_data(json_data_list)
     # print(json.dumps(merged_data, indent=2))
 
+    import random
+    # 打乱顺序
+    random.shuffle(merged_data)
+
     base_path, file_name = os.path.split(file_path)
     file_name_without_extension, file_extension = os.path.splitext(file_name)
     new_file_name = f"{file_name_without_extension}_processed{file_extension}"

@@ -1,3 +1,4 @@
+import os
 def split_file(file_name, chunk_count):
     try:
         # 读取原始文件
@@ -14,8 +15,10 @@ def split_file(file_name, chunk_count):
                 chunk_size = lines_per_chunk + (1 if i < remainder_lines else 0)
                 chunk = lines[start:start + chunk_size]
 
+                file_name_without_extension, file_extension = os.path.splitext(file_name)
+
                 # 写入分割后的文件
-                with open(f"{file_name}_chunk_{i + 1}.lson", 'w', encoding='utf-8') as chunk_file:
+                with open(f"{file_name_without_extension}_chunk_{i + 1}{file_extension}", 'w', encoding='utf-8') as chunk_file:
                     chunk_file.writelines(chunk)
 
                 start += chunk_size
