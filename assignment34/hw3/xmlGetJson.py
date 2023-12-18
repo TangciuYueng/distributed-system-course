@@ -3,8 +3,8 @@ import json
 import os
 
 data={}
-dir_path = 'E:\\xx\\distributed_system\\assignment34\\hw3'
-file_path='E:\\xx\\distributed_system\\assignment34\\hw3\\test.xml'
+dir_path = 'D:\\大学学习资料\\大三上学期学习\\分布式系统\\distributed-system-course\\assignment34\\hw3'
+file_path='D:\\大学学习资料\\大三上学期学习\\分布式系统\\distributed-system-course\\assignment34\\hw3\\test.xml'
 
 with open(file_path, 'r', encoding='utf-8') as f:
     author=[]
