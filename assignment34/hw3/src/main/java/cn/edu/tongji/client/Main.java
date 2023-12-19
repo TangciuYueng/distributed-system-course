@@ -1,24 +1,50 @@
 package cn.edu.tongji.client;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.net.Socket;
+import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
+import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
-        try{
-            // 创建Socket并连接到服务器的指定端口
-            Socket socket = new Socket("localhost", 8080);
+        try (Scanner scanner = new Scanner(System.in)) {
+            while (true) {
+                System.out.println("Enter the name");
+                String name = scanner.nextLine();
 
-            // 获取输出流
-            PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
+                if (name.equals("q")) {
+                    break;
+                }
 
-            // 发送消息到服务器
-            writer.println("Hello, Server!");
+                try (Socket socket = new Socket("localhost", 8080);
+                     DataOutputStream dataOutputStream = new DataOutputStream(socket.getOutputStream());
+                     DataInputStream dataInputStream = new DataInputStream(socket.getInputStream())) {
+                    byte[] nameBytes = name.getBytes(StandardCharsets.UTF_8);
+                    dataOutputStream.writeInt(nameBytes.length);
+                    dataOutputStream.write(nameBytes);
 
-            // 关闭Socket连接
-            socket.close();
-        } catch(IOException e){
+                    int length = dataInputStream.readInt();
+                    if (length > 0) {
+                        byte[] dataBytes = new byte[length];
+                        dataInputStream.readFully(dataBytes);
+                        String data = new String(dataBytes, StandardCharsets.UTF_8);
+                        System.out.println(data);
+                    } else {
+                        System.out.println("Name not found");
+                    }
+                } catch (UnknownHostException e) {
+                    // 处理 UnknownHostException
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    // 处理 IOException
+                    e.printStackTrace();
+                }
+            }
+        } catch (Exception e) {
+            // 处理 Scanner 关闭异常
             e.printStackTrace();
         }
     }
