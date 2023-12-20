@@ -1,38 +1,51 @@
 package cn.edu.tongji.server;
 
 import cn.edu.tongji.tools.PersistentBTree;
-import cn.edu.tongji.tools.Query;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Main {
-     private static final String FILE_NAME = "dblp_line_processed_chunk_1";
-    private static final int NUM_BUCKETS = 4;
+    public static final int SERVER_NUM = 6;
+    public static final int BUCKET_PER_SERVER = 4;
+    public static final int PORT_BASE = 8080;
 
-    public static void main(String[] args) {
-        // 在Server端加载trees
-        PersistentBTree<String, Long>[] trees = loadTrees();
+    public static void createServerThread(final int serverNum) {
+        try (ServerSocket serverSocket = new ServerSocket(PORT_BASE + serverNum)) {
+            PersistentBTree<String, Long>[] trees = new PersistentBTree[4];
 
-        try (ServerSocket serverSocket = new ServerSocket(8080)) {
-            System.out.println("Server listening on port 8080...");
-            while (true) {
-                Socket clientSocket = serverSocket.accept();
-                // 每次接收到客户端请求，创建一个新的处理线程
-                new ServerHandler(clientSocket, trees).start();
+            for (int i = 0; i < BUCKET_PER_SERVER; i++) {
+                final long startTime = System.currentTimeMillis();
+                trees[i] = PersistentBTree.loadFromFile("dblp_line_processed_chunk_" + (serverNum + 1) + "_bucket_" + i + "_index_tree.ser");
+                System.out.println("服务器" + (serverNum + 1) + "读取" + i + "号桶索引用时：" + ((double) (System.currentTimeMillis() - startTime) / 1000) + "s");
             }
-        } catch (IOException e) {
+
+            while (true) {
+                System.out.println("Server " + (serverNum + 1) + " Waiting on Port " + (PORT_BASE + serverNum) + "...");    //阻塞等待连接
+                Socket connectionSocket = serverSocket.accept();  //阻塞等待连接
+
+                System.out.println("Welcome Connection From " + connectionSocket.getInetAddress());  //连接成功
+                DataInputStream inFromClient = new DataInputStream(connectionSocket.getInputStream());
+                final String author = inFromClient.readUTF();  //读取作者名
+                new DataSearchThread(connectionSocket, author, trees).run();  //创建服务对象并运行主过程
+
+                System.out.println(connectionSocket.getInetAddress() + " disconnected");  //断开连接，重新等待
+            }
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private static PersistentBTree<String, Long>[] loadTrees() {
-        PersistentBTree<String, Long>[] trees = new PersistentBTree[NUM_BUCKETS];
-        try {
-            for (int i = 0; i < NUM_BUCKETS; ++i) {
-                trees[i] = PersistentBTree.loadFromFile(FILE_NAME + "_bucket_" + i + "_index_tree.ser");
+    public static void main(String[] args) {
+        try (ExecutorService exec = Executors.newCachedThreadPool()) {
+            for (int i = 0; i < SERVER_NUM; i++) {
+                final int serverNum = i;
+
+                System.out.println("服务器初始化中...");
+                exec.execute(() -> createServerThread(serverNum));
             }
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
