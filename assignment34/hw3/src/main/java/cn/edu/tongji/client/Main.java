@@ -10,7 +10,7 @@ import static cn.edu.tongji.server.Main.*;
 public class Main {
     public static void main(String[] args) {
         while (true) {
-            try (ExecutorService exec = Executors.newCachedThreadPool()) {
+            try (ExecutorService exec = Executors.newFixedThreadPool(SERVER_NUM)) {
                 System.out.print("请输入查询作者名：");
                 final String author = new Scanner(System.in).nextLine();
 

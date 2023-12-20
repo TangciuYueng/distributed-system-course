@@ -15,7 +15,7 @@ public class Main {
 
     public static void createServerThread(final int serverNum) {
         try (ServerSocket serverSocket = new ServerSocket(PORT_BASE + serverNum)) {
-            PersistentBTree<String, Long>[] trees = new PersistentBTree[4];
+            PersistentBTree<String, Long>[] trees = new PersistentBTree[BUCKET_PER_SERVER];
 
             for (int i = 0; i < BUCKET_PER_SERVER; i++) {
                 final long startTime = System.currentTimeMillis();
@@ -47,9 +47,6 @@ public class Main {
                 System.out.println("服务器初始化中...");
                 exec.execute(() -> createServerThread(serverNum));
             }
-        } catch (IOException | ClassNotFoundException e) {
-            e.printStackTrace();
         }
-        return trees;
     }
 }

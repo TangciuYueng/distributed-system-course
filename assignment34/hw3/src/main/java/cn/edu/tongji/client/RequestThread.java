@@ -1,17 +1,15 @@
 package cn.edu.tongji.client;
 
+import lombok.AllArgsConstructor;
+
 import java.io.*;
 import java.net.Socket;
 import static cn.edu.tongji.server.Main.*;
 
+@AllArgsConstructor
 public class RequestThread implements Runnable {
     private final int serverNum;
     private final String author;
-
-    public RequestThread(final int serverNum, final String author) {
-        this.serverNum = serverNum;
-        this.author = author;
-    }
 
     @Override
     public void run() {

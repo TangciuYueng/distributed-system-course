@@ -1,6 +1,8 @@
 package cn.edu.tongji.server;
 
 import cn.edu.tongji.tools.PersistentBTree;
+
+import static cn.edu.tongji.server.Main.BUCKET_PER_SERVER;
 import static cn.edu.tongji.tools.Query.customHashFunction;
 
 import java.io.DataOutputStream;
@@ -22,7 +24,7 @@ public class DataSearchThread implements Runnable {
     public void run() {
         try {
             DataOutputStream outToClient = new DataOutputStream(connectionSocket.getOutputStream());
-            final int bucketNum = customHashFunction(author) % 4;
+            final int bucketNum = customHashFunction(author) % BUCKET_PER_SERVER;
             Long pointer = trees[bucketNum].search(author);
 
             if (pointer == null) {
