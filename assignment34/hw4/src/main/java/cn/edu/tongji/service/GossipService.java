@@ -68,11 +68,11 @@ public class GossipService {
     private void printNodes() {
         LOGGER.log(Level.INFO, "Printing nodes...");
 
-        getAliveMembers().forEach(node ->
+        getMembers(false).forEach(node ->
                 LOGGER.log(Level.INFO, "Health status: {0}:{1} - alive",
                         new Object[]{node.getHostName(), node.getPort()}));
 
-        getFailedMembers().forEach(node ->
+        getMembers(true).forEach(node ->
                 LOGGER.log(Level.INFO, "Health status: {0}:{1} - failed",
                         new Object[]{node.getHostName(), node.getPort()}));
     }
@@ -95,18 +95,20 @@ public class GossipService {
         Node newNode = service.receiveGossip();
         nodes.compute(newNode.getId(), (key, existingMember) -> {
             if (existingMember == null) {
+                // 新加入的节点
                 newNode.setConfig(config);
-                newNode.setLastUpdateTime();
+                newNode.updateLastUpdateTime();
                 if (onNewMember != null) {
                     onNewMember.update(newNode.getAddress());
                 }
                 return newNode;
             } else {
+                // 节点已经存在于映射表 更新现有节点的心跳序列
                 LOGGER.log(Level.INFO, "Updating sequence number for node {0}", existingMember.getId());
                 existingMember.setHeartbeatSeqNum(newNode.getHeartbeatSeqNum());
                 return existingMember;
             }
-    });
+        });
     }
 
     private void startSenderThread() {
@@ -115,13 +117,17 @@ public class GossipService {
         }, 0, config.getUpdateFrequency().toMillis(), TimeUnit.MILLISECONDS);
     }
 
+    // 发送自己的信息给随机选中的节点
     private void sendGossipToRandomNode() {
         self.incrementSeqNum();
         List<UUID> nodesToUpdate = new ArrayList<>(nodes.keySet());
+        // 候选列表中移除自己
         nodesToUpdate.remove(self.getId());
 
+        // 随机打乱
         Collections.shuffle(nodesToUpdate);
 
+        // 发送给 config 中设置的数量和实际数量中的最小值
         int peersCount = Math.min(config.getNumOfNodeUpdated(), nodesToUpdate.size());
         for (int i = 0; i < peersCount; i++) {
             UUID targetKey = nodesToUpdate.get(i);
@@ -130,14 +136,20 @@ public class GossipService {
         }
     }
 
+    // 检查 failure 节点
     private void detectFailedNodes() {
+        // 确保多个线程对 memberList 访问安全
         synchronized (nodes) {
             Iterator<Map.Entry<UUID, Node>> iterator = nodes.entrySet().iterator();
+            // 遍历 memberList
             while (iterator.hasNext()) {
                 Map.Entry<UUID, Node> entry = iterator.next();
                 Node node = entry.getValue();
+                // 记录节点先前的失败状态
                 boolean hadFailed = node.isFailed();
+                // 然后检查
                 node.checkIfFailed();
+                // 发送变化
                 if (hadFailed != node.isFailed()) {
                     if (node.isFailed()) {
                         if (onFailedMember != null) {
@@ -159,13 +171,13 @@ public class GossipService {
         }
     }
 
-    public ArrayList<InetSocketAddress> getAliveMembers() {
+    public ArrayList<InetSocketAddress> getMembers(boolean failed) {
         int initialSize = nodes.size();
         ArrayList<InetSocketAddress> aliveMembers =
                 new ArrayList<>(initialSize);
         for (UUID key : nodes.keySet()) {
             Node node = nodes.get(key);
-            if (!node.isFailed()) {
+            if (node.isFailed() == failed) {
                 String ipAddress = String.valueOf(node.getAddress());
                 int port = node.getPort();
                 aliveMembers.add(new InetSocketAddress(ipAddress, port));
@@ -173,20 +185,6 @@ public class GossipService {
         }
 
         return aliveMembers;
-    }
-
-    public ArrayList<InetSocketAddress> getFailedMembers() {
-        ArrayList<InetSocketAddress> failedMembers = new ArrayList<>();
-        for (UUID key : nodes.keySet()) {
-            Node node = nodes.get(key);
-            node.checkIfFailed();
-            if (node.isFailed()) {
-                String ipAddress = String.valueOf(node.getAddress());
-                int port = node.getPort();
-                failedMembers.add(new InetSocketAddress(ipAddress, port));
-            }
-        }
-        return failedMembers;
     }
 
     public ArrayList<InetSocketAddress> getAllMembers() {
