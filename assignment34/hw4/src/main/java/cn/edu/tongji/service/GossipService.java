@@ -119,6 +119,7 @@ public class GossipService {
 
     // 发送自己的信息给随机选中的节点
     private void sendGossipToRandomNode() {
+        // 发送的同时增加自己的 seqNum 并且 更新时间戳
         self.incrementSeqNum();
         List<UUID> nodesToUpdate = new ArrayList<>(nodes.keySet());
         // 候选列表中移除自己
