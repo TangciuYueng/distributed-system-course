@@ -23,7 +23,7 @@ public class Member {
         this.incarnation = 0;
     }
 
-    private Object data() {
+    public Member getCopy() {
         return new Member(meta, host, state, incarnation);
     }
 
