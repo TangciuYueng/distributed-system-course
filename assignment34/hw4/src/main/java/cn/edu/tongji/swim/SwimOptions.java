@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 public class SwimOptions {
     private String codec;
     private int disseminationFactor;
+    private int disseminationLimit;
     private int interval;
     private int pingTimeout;
     private int pingReqTimeout;
