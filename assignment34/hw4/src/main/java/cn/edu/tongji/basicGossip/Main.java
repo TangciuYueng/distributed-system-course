@@ -1,8 +1,7 @@
-package cn.edu.tongji;
+package cn.edu.tongji.basicGossip;
 
-import cn.edu.tongji.config.GossipConfig;
-import cn.edu.tongji.service.GossipService;
-import cn.edu.tongji.service.SocketService;
+import cn.edu.tongji.basicGossip.config.GossipConfig;
+import cn.edu.tongji.basicGossip.service.GossipService;
 
 import java.net.InetSocketAddress;
 import java.net.SocketException;

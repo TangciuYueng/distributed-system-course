@@ -1,6 +1,6 @@
-package cn.edu.tongji.service;
+package cn.edu.tongji.basicGossip.service;
 
-import cn.edu.tongji.gossip.Node;
+import cn.edu.tongji.basicGossip.gossip.Node;
 
 import java.io.*;
 import java.net.DatagramPacket;

@@ -1,4 +1,4 @@
-package cn.edu.tongji.config;
+package cn.edu.tongji.basicGossip.config;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

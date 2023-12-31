@@ -1,4 +1,4 @@
-package cn.edu.tongji.service;
+package cn.edu.tongji.basicGossip.service;
 
 import java.net.InetSocketAddress;
 

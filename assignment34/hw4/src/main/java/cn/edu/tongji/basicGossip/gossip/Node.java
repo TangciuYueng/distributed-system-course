@@ -1,6 +1,6 @@
-package cn.edu.tongji.gossip;
+package cn.edu.tongji.basicGossip.gossip;
 
-import cn.edu.tongji.config.GossipConfig;
+import cn.edu.tongji.basicGossip.config.GossipConfig;
 import lombok.Data;
 
 import java.net.InetAddress;
