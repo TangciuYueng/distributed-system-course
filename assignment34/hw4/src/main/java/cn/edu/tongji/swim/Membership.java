@@ -1,7 +1,5 @@
 package cn.edu.tongji.swim;
 
-import org.msgpack.annotation.Message;
-
 import java.lang.management.MemoryType;
 import java.util.*;
 import java.util.concurrent.*;

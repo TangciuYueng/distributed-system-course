@@ -12,7 +12,7 @@ import java.util.TimerTask;
 public class Swim {
     private SwimOptions opts;
     private Codec codec;
-//    private Disseminator disseminator;
+    private Disseminator disseminator;
 //    private FailureDetector failureDetector;
 //    private Membership membership;
     private Net net;
