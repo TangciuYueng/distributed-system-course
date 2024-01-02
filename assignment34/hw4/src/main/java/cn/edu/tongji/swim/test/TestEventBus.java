@@ -3,10 +3,12 @@ package cn.edu.tongji.swim.test;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.greenrobot.eventbus.EventBus;
-import org.greenrobot.eventbus.Subscribe;
-import org.greenrobot.eventbus.ThreadMode;
+
+import java.util.Scanner;
 
 public class TestEventBus {
+    Subscriber subscriber = new Subscriber();
+
     // 事件类 用于在不同组件之间传递消息
     @AllArgsConstructor
     @Data
@@ -17,30 +19,32 @@ public class TestEventBus {
     EventBus eventBus = new EventBus();
 
     void start() {
-        eventBus.register(this);
+        eventBus.register(subscriber);
     }
 
     void stop() {
-        eventBus.unregister(this);
+        eventBus.unregister(subscriber);
     }
 
     // 发送事件
-    void sendMessage() {
-        MessageEvent event = new MessageEvent("Hello, EventBus!");
+    void sendMessage(String input) {
+        MessageEvent event = new MessageEvent(input);
         eventBus.post(event);
-    }
-
-    // 订阅事件 事件发送时候调用
-    @Subscribe(threadMode = ThreadMode.MAIN)
-    public void onMessageEvent(MessageEvent event) {
-        String message = event.getMessage();
-        System.out.println("Received message: " + message);
     }
 
     public static void main(String[] args) {
         TestEventBus test = new TestEventBus();
         test.start();
-        test.sendMessage();
+        Scanner scanner = new Scanner(System.in);
+        String input;
+        while (true) {
+            input = scanner.nextLine();
+            test.sendMessage(input);
+            if (input.equalsIgnoreCase("q")) {
+                break;
+            }
+        }
         test.stop();
+        scanner.close();
     }
 }
