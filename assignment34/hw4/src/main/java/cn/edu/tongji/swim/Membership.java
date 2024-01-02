@@ -138,13 +138,13 @@ public class Membership {
         Runnable setFaultyTask = () -> {
             hostToSuspectTimeout.remove(copy2.getHost());
             copy2.setState(Member.State.FAULTY);
-            onUpdate(copy2);
+            onUpdate(new UpdateEvent(copy2));
         };
 
         // 更新状态的任务
         Runnable updateTask = () -> {
             hostToSuspectTimeout.remove(copy2.getHost());
-            onUpdate(copy.getCopy());
+            onUpdate(new UpdateEvent(copy.getCopy()));
         };
 
         // 延迟执行设置为 FAULTY 的任务

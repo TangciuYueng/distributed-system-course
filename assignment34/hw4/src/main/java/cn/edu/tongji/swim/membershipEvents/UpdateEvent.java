@@ -7,5 +7,5 @@ import lombok.Data;
 @Data
 @AllArgsConstructor
 public class UpdateEvent {
-    private Member member;
+    private Member data;
 }

@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class SwimOptions {
+    private Swim swim;
     private String codec;
     private int disseminationFactor;
     private int disseminationLimit;
