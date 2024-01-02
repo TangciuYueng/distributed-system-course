@@ -1,4 +1,4 @@
-package cn.edu.tongji.swim.membershpEvents;
+package cn.edu.tongji.swim.membershipEvents;
 
 import cn.edu.tongji.swim.Member;
 import lombok.AllArgsConstructor;

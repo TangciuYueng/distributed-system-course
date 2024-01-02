@@ -1,5 +1,8 @@
 package cn.edu.tongji.swim;
 
+import lombok.Data;
+import org.greenrobot.eventbus.EventBus;
+
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
@@ -7,10 +10,12 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+@Data
 public class FailureDetector {
 
     private final Swim swim;
     private final int interval;
+    private EventBus eventBus;
     private final int pingTimeout;
     private final int pingReqTimeout;
     private final int pingReqGroupSize;
@@ -33,8 +38,11 @@ public class FailureDetector {
         public static final int pingReqTimeout = 12;
         public static final int pingReqGroupSize = 3;
     }
+
+    // 构造函数
     public FailureDetector(Swim swim, int interval, int pingTimeout, int pingReqTimeout, int pingReqGroupSize) {
         this.swim = swim;
+        this.eventBus = new EventBus();
         this.interval = interval != 0 ? interval : Default.interval;
         this.pingTimeout = pingTimeout != 0 ? pingTimeout : Default.pingTimeout;
         this.pingReqTimeout = pingReqTimeout != 0 ? pingReqTimeout : Default.pingReqTimeout;
