@@ -1,7 +1,11 @@
 package cn.edu.tongji.swim.netEvents;
 
-public class SyncEvent extends NetEvent {
-    public SyncEvent(byte[] buffer, Rinfo rinfo) {
-        super(buffer, rinfo);
-    }
+import cn.edu.tongji.swim.Member;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+@Data
+@AllArgsConstructor
+public class SyncEvent {
+    private Member data;
 }

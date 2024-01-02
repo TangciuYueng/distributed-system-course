@@ -1,7 +1,14 @@
 package cn.edu.tongji.swim;
 
+import cn.edu.tongji.swim.failureDetectorEvents.SuspectEvent;
+import cn.edu.tongji.swim.membershipEvents.ChangeEvent;
+import cn.edu.tongji.swim.membershipEvents.DropEvent;
+import cn.edu.tongji.swim.netEvents.AckEvent;
+import cn.edu.tongji.swim.netEvents.SyncEvent;
+import cn.edu.tongji.swim.netEvents.UpdateEvent;
 import lombok.Data;
 import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -21,7 +28,8 @@ public class Membership {
     private boolean preferCurrentMeta;
     private Map<String, Member> hostToMember;
     private Map<String, Member> hostToFaulty;
-    private Map<String, Long> hostToSuspectTimeout;
+    private Map<String, Member> hostToIterable;
+    private Map<String, ScheduledFuture<?>> hostToSuspectTimeout;
     private ScheduledExecutorService scheduler;
 
     // 构造函数
@@ -37,140 +45,286 @@ public class Membership {
         this.preferCurrentMeta = preferCurrentMeta;
         this.hostToMember = new ConcurrentHashMap<>();
         this.hostToFaulty = new ConcurrentHashMap<>();
+        this.hostToIterable = new ConcurrentHashMap<>();
         this.hostToSuspectTimeout = new ConcurrentHashMap<>();
         this.scheduler = Executors.newScheduledThreadPool(1);
 
         start();
     }
 
+    // 将当前对象注册为故障检测器的事件总线和网络事件总线的事件监听器
     private void start() {
-        swim
+        swim.getFailureDetector().getEventBus().register(this);
         swim.getNet().getEventBus().register(this);
 
-        hostToSuspectTimeout.forEach((host, timeout) ->
-            onSuspect(hostToMember.get(host))
-        );
-    }
-
-    public void stop() {
-        swim.getFailureDetector().removeSuspectListener(suspectListener);
-        swim.getNet().removeAckListener(ackListener);
-        swim.getNet().removeSyncListener(syncListener);
-        swim.getNet().removeUpdateListener(updateListener);
-
         hostToSuspectTimeout.keySet().forEach(host -> {
-//            ScheduledFuture<?> future = hostToSuspectTimeout.remove(host);
-//            if (future != null) {
-//                future.cancel(false);
-//            }
+            onSuspect(new SuspectEvent(hostToMember.getOrDefault(host, null)));
         });
     }
 
-    private void onSuspect(Member member) {
-        /*
-        var self = this;
-        var data;
-
-        member = new Member(member.data());
-        member.state = Member.State.Suspect;
-        data = member.data();
-        */
-
-        // 获得副本
-        Member copy = member.getCopy();
-        // 将设置为 SUSPECT
-        copy.setState(Member.State.SUSPECT);
-        Member copy2 = copy.getCopy();
-
-        TimerTask setFaultyTask = new TimerTask() {
-            @Override
-            public void run() {
-                hostToSuspectTimeout.remove(copy2.getHost());
-                copy2.setState(Member.State.FAULTY);
-                onUpdate(copy2);
-            }
-        };
-        Timer timer = new Timer();
-        timer.schedule(setFaultyTask, suspectTimeout);
-
-        TimerTask updateTask = new TimerTask() {
-            @Override
-            public void run() {
-                hostToSuspectTimeout.remove(copy2.getHost());
-                onUpdate(copy.getCopy());
-            }
-        };
-
-        timer.schedule(updateTask, 0);
+    // 解除注册
+    public void stop() {
+        swim.getFailureDetector().getEventBus().unregister(this);
+        swim.getNet().getEventBus().unregister(this);
+        scheduler.shutdown();
+        // 取消设置的定时任务
+//
+//        public class ScheduledExecutorExample {
+//            private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+//            private ScheduledFuture<?> scheduledFuture;
+//
+//            public void setTime() {
+//                // Schedule a task to be executed after a delay of 1000 milliseconds (1 second)
+//                scheduledFuture = scheduler.schedule(() -> {
+//                    System.out.println("Task executed after delay");
+//                }, 1000, TimeUnit.MILLISECONDS);
+//            }
+//
+//            public void cancelTime() {
+//                // Cancel the scheduled task if it has not already been executed
+//                if (scheduledFuture != null && !scheduledFuture.isDone()) {
+//                    scheduledFuture.cancel(true);
+//                    System.out.println("Task canceled");
+//                }
+//            }
+//
+//            public static void main(String[] args) {
+//                ScheduledExecutorExample example = new ScheduledExecutorExample();
+//
+//                // Set the time and schedule the task
+//                example.setTime();
+//
+//                // Sleep for a while to allow the scheduled task to execute (or be canceled)
+//                try {
+//                    Thread.sleep(2000);
+//                } catch (InterruptedException e) {
+//                    e.printStackTrace();
+//                }
+//
+//                // Cancel the scheduled task
+//                example.cancelTime();
+//
+//                // Shutdown the executor service
+//                example.scheduler.shutdown();
+//            }
+//        }
     }
 
-    private void onAck(String host) {
+    @Subscribe
+    public void onAck(AckEvent event) {
+        String host = event.getHost();
         Member member = hostToMember.getOrDefault(host, null);
         if (member != null && member.getState() == Member.State.SUSPECT) {
             swim.getNet().sendMessage(new Message(MessageType.UPDATE, member.getCopy()), host);
         }
     }
 
-    private void onSync(Member member) {
-        String host = member.getHost();
+    @Subscribe
+    public void onSuspect(SuspectEvent event) {
+        Member member = event.getMember();
+        if (member == null) {
+            return;
+        }
+        // 获得副本
+        Member copy = member.getCopy();
+        // 将设置为 SUSPECT
+        copy.setState(Member.State.SUSPECT);
+        Member copy2 = copy.getCopy();
+
+        // 取消对应延时任务
+        hostToSuspectTimeout.get(copy2.getHost()).cancel(true);
+
+        // 设置为 FAULTY 的任务
+        Runnable setFaultyTask = () -> {
+            hostToSuspectTimeout.remove(copy2.getHost());
+            copy2.setState(Member.State.FAULTY);
+            onUpdate(copy2);
+        };
+
+        // 更新状态的任务
+        Runnable updateTask = () -> {
+            hostToSuspectTimeout.remove(copy2.getHost());
+            onUpdate(copy.getCopy());
+        };
+
+        // 延迟执行设置为 FAULTY 的任务
+        scheduler.schedule(setFaultyTask, suspectTimeout, TimeUnit.MILLISECONDS);
+
+        // 立即执行更新状态的任务
+        scheduler.schedule(updateTask, 0, TimeUnit.MILLISECONDS);
+    }
+
+    @Subscribe
+    private void onSync(SyncEvent event) {
+        var data = event.getData();
+        String host = data.getHost();
+
+        updateAlive(data);
 
         // 获取本地和 faulty 的所有
         List<Member> allMembers = all(true, true);
         List<Message> messages = new ArrayList<>();
 
-        for (Member data : allMembers) {
-            Message message = new Message(MessageType.UPDATE, data);
+        for (Member data1 : allMembers) {
+            Message message = new Message(MessageType.UPDATE, data1);
             messages.add(message);
         }
-
+        // 发送多条 msg
         swim.getNet().sendMessages(messages, host);
     }
 
     private void sync(List<String> hosts) {
         List<Message> messages = List.of(new Message(MessageType.SYNC, local.getCopy()));
 
-        all(false, true).forEach(member -> {
-            messages.add(MessageType.UPDATE, member);
-        });
+        all(false, true).forEach(member ->
+            messages.add(new Message(MessageType.UPDATE, member))
+        );
 
         hosts.forEach(host ->
             swim.getNet().sendMessages(messages, host)
         );
     }
 
-    private void onUpdate(Member member) {
-        System.out.println("received update" + member);
+    @Subscribe
+    private void onUpdate(UpdateEvent event) {
+        var data = event.getData();
 
-        if (member.getState() == Member.State.ALIVE) {
-            updateAlive(member);
-        } else if (member.getState() == Member.State.SUSPECT) {
-            updateSuspect(member);
-        } else if (member.getState() == Member.State.FAULTY) {
-            updateFaulty(member);
+        System.out.println("received update" + data);
+
+        if (data.getState() == Member.State.ALIVE) {
+            updateAlive(data);
+        } else if (data.getState() == Member.State.SUSPECT) {
+            updateSuspect(data);
+        } else if (data.getState() == Member.State.FAULTY) {
+            updateFaulty(data);
         }
     }
 
-    void updateAlive(Member member) {
+    void updateAlive(Member data) {
+        if (data.getHost() == local.getHost()) {
+            if (local.incarnate(data, false, preferCurrentMeta)) {
+                eventBus.post(new cn.edu.tongji.swim.membershipEvents.UpdateEvent(local.getCopy()));
+            } else {
+                eventBus.post(new DropEvent(data));
+            }
+            return;
+        }
 
+        var member = hostToFaulty.getOrDefault(data.getHost(), null);
+        if (member != null && member.getIncarnation() > data.getIncarnation()) {
+            eventBus.post(new DropEvent(data));
+            return;
+        }
+
+        var member1 = hostToMember.getOrDefault(data.getHost(), null);
+        if (member1 == null || data.getIncarnation() > member1.getIncarnation()) {
+            hostToSuspectTimeout.get(data.getHost()).cancel(true);
+            hostToSuspectTimeout.remove(data.getHost());
+            hostToFaulty.remove(data.getHost());
+
+            hostToMember.put(data.getHost(), new Member(data));
+            if (member1 == null) {
+                hostToIterable.put(data.getHost(), hostToMember.get(data.getHost()));
+                eventBus.post(new ChangeEvent(hostToMember.get(data.getHost()).getCopy()));
+            }
+
+            eventBus.post(new cn.edu.tongji.swim.membershipEvents.UpdateEvent(hostToMember.get(data.getHost()).getCopy()));
+        } else {
+            eventBus.post(new DropEvent(data));
+        }
     }
 
-    void updateSuspect(Member member) {
+    void updateSuspect(Member data) {
+        if (data.getHost() == local.getHost()) {
+            eventBus.post(new DropEvent(data));
+            local.incarnate(data, true, preferCurrentMeta);
+            eventBus.post(new cn.edu.tongji.swim.membershipEvents.UpdateEvent(local.getCopy()));
+            return;
+        }
 
+        var member = hostToFaulty.getOrDefault(data.getHost(), null);
+        if (member != null && member.getIncarnation() >= data.getIncarnation()) {
+            eventBus.post(new DropEvent(data));
+            return;
+        }
+
+        var member1 = hostToMember.getOrDefault(data.getHost(), null);
+        if (member1 == null ||
+            data.getIncarnation() > member1.getIncarnation() ||
+            data.getIncarnation() == member1.getIncarnation() &&
+            member1.getState() == Member.State.ALIVE) {
+
+            hostToFaulty.remove(data.getHost());
+
+            hostToMember.put(data.getHost(), new Member(data));
+            if (member1 == null) {
+                hostToIterable.put(data.getHost(), hostToMember.get(data.getHost()));
+                eventBus.post(new ChangeEvent(hostToMember.get(data.getHost()).getCopy()));
+            }
+
+            eventBus.post(new cn.edu.tongji.swim.membershipEvents.UpdateEvent(hostToMember.get(data.getHost()).getCopy()));
+        } else {
+            eventBus.post(new DropEvent(data));
+        }
     }
 
-    void updateFaulty(Member member) {
+    void updateFaulty(Member data) {
+        if (data.getHost() == local.getHost()) {
+            eventBus.post(new DropEvent(data));
+            local.incarnate(data, true, preferCurrentMeta);
+            return;
+        }
 
+        var member = hostToMember.getOrDefault(data.getHost(), null);
+        if (member != null && data.getIncarnation() >= member.getIncarnation()) {
+            hostToFaulty.put(data.getHost(), new Member(data));
+            hostToMember.remove(data.getHost());
+            hostToIterable.remove(data.getHost());
+
+            eventBus.post(new ChangeEvent(data));
+            eventBus.post(new cn.edu.tongji.swim.membershipEvents.UpdateEvent(data));
+        } else {
+            eventBus.post(new DropEvent(data));
+        }
     }
 
     Member next() {
+        List<String> hosts = hostToIterable.keySet().stream().toList();
+        String host;
+        Member member;
 
+        if (hosts.size() == 0) {
+            shuffle();
+            hosts = hostToIterable.keySet().stream().toList();
+        }
+        Random random = new Random();
+        host = hosts.get(random.nextInt(hosts.size()));
+        member = hostToIterable.get(host);
+        hostToIterable.remove(host);
+
+        return member;
     }
 
-    List<Member> random (int n) {
+    List<String> random (int n) {
+        List<String> hosts = hostToMember.keySet().stream().toList();
+        List<String> selected = new ArrayList<>();
+        int index, i;
+        Random random = new Random();
+        for (i = 0; i < n && i < hosts.size(); ++i) {
+            index = i + random.nextInt(hosts.size() - i);
+            selected.add(hosts.get(index));
+        }
 
+        return selected;
     }
 
-    void shuffle() {}
+    void shuffle() {
+        hostToIterable = new ConcurrentHashMap<>();
+
+        hostToMember.forEach((host, member) ->
+            hostToIterable.put(host, member)
+        );
+    }
 
     private int size(boolean hasLocal) {
         int count = hostToMember.size();
@@ -231,7 +385,7 @@ public class Membership {
 
     void updateMeta(Object meta) {
         local.setMeta(meta);
-        local.incarnate();
+        local.incarnate(null, false, false);
 //        this.emit(Membership.EventType.Update, this.local.data());
     }
 }

@@ -1,7 +1,11 @@
 package cn.edu.tongji.swim.netEvents;
 
-public class UpdateEvent extends NetEvent {
-    public UpdateEvent(byte[] buffer, Rinfo rinfo) {
-        super(buffer, rinfo);
-    }
+import cn.edu.tongji.swim.Member;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+@Data
+@AllArgsConstructor
+public class UpdateEvent {
+    private Member data;
 }

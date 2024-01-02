@@ -1,9 +1,11 @@
 package cn.edu.tongji.swim.membershipEvents;
 
 import cn.edu.tongji.swim.Member;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 
-public class DropEvent extends MembershipEvent {
-    public DropEvent(Member data, String host) {
-        super(data, host);
-    }
+@Data
+@AllArgsConstructor
+public class DropEvent {
+    private Member data;
 }

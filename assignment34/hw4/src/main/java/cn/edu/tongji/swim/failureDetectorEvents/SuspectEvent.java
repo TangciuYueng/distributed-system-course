@@ -1,9 +1,11 @@
 package cn.edu.tongji.swim.failureDetectorEvents;
 
 import cn.edu.tongji.swim.Member;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 
-public class SuspectEvent extends FailureDetectorEvent {
-    public SuspectEvent(Member member, String host) {
-        super(member, host);
-    }
+@Data
+@AllArgsConstructor
+public class SuspectEvent {
+    private Member member;
 }

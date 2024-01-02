@@ -23,6 +23,13 @@ public class Member {
         this.incarnation = 0;
     }
 
+    public Member(Member member) {
+        this.meta = member.meta;
+        this.host = member.host;
+        this.state = member.state;
+        this.incarnation = member.incarnation;
+    }
+
     public Member getCopy() {
         return new Member(meta, host, state, incarnation);
     }
