@@ -1,7 +1,14 @@
 package cn.edu.tongji.swim.netEvents;
 
-public class ListeningEvent extends NetEvent {
-    public ListeningEvent(byte[] buffer, Rinfo rinfo) {
-        super(buffer, rinfo);
-    }
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+import java.net.InetAddress;
+
+@Data
+@AllArgsConstructor
+public class ListeningEvent {
+    private InetAddress address;
+    private int port;
+    private int maxDgramSize;
 }

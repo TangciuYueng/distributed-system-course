@@ -1,7 +1,14 @@
 package cn.edu.tongji.swim.netEvents;
 
-public class ErrorEvent extends NetEvent {
-    public ErrorEvent(byte[] buffer, Rinfo rinfo) {
-        super(buffer, rinfo);
-    }
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+import java.net.InetAddress;
+
+@Data
+@AllArgsConstructor
+public class ErrorEvent {
+    private InetAddress address;
+    private int port;
+    private String message;
 }

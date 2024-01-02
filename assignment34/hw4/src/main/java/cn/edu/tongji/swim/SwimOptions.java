@@ -21,9 +21,4 @@ public class SwimOptions {
     private UdpOptions udp;
     private int joinTimeout;
     private int joinCheckInterval;
-
-    public static class UdpOptions {
-        public String type;
-        public int maxDgramSize;
-    }
 }
