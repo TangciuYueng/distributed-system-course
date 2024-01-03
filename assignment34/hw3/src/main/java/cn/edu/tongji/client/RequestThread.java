@@ -4,16 +4,18 @@ import lombok.AllArgsConstructor;
 
 import java.io.*;
 import java.net.Socket;
-import static cn.edu.tongji.server.Main.*;
+import static cn.edu.tongji.server.MainServer.PORT;
 
 @AllArgsConstructor
 public class RequestThread implements Runnable {
     private final int serverNum;
     private final String author;
+    private final String address;
+    private final int port;
 
     @Override
     public void run() {
-        try (Socket connectionSocket = new Socket("localhost", PORT_BASE + serverNum)) {
+        try (Socket connectionSocket = new Socket(address, port)) {
             final long startTime = System.nanoTime();
             DataOutputStream outToServer = new DataOutputStream(connectionSocket.getOutputStream());
             DataInputStream inFromServer = new DataInputStream(connectionSocket.getInputStream());
