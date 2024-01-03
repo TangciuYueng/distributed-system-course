@@ -35,12 +35,13 @@ def process_json_file(file_path):
     with open(file_path, 'r') as file:
         json_data_list = [process_individual_json(line.strip()) for line in file]
 
-    merged_data = merge_json_data(json_data_list)
+    # merged_data = merge_json_data(json_data_list)
     # print(json.dumps(merged_data, indent=2))
 
     import random
     # 打乱顺序
-    random.shuffle(merged_data)
+    # random.shuffle(merged_data)
+    random.shuffle(json_data_list)
 
     base_path, file_name = os.path.split(file_path)
     file_name_without_extension, file_extension = os.path.splitext(file_name)
@@ -48,7 +49,8 @@ def process_json_file(file_path):
     new_file_path = os.path.join(base_path, new_file_name)
 
     with open(new_file_path, 'w') as file:
-        for data in merged_data:
+        # for data in merged_data:
+        for data in json_data_list:
             file.write(json.dumps(data) + '\n')
 
 if __name__ == "__main__":

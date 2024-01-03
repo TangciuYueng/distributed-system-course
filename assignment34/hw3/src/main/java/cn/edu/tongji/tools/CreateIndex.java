@@ -16,9 +16,21 @@ public class CreateIndex {
     }
 
     public static void main(String[] args) {
-        Scanner sc = new Scanner(System.in);
-        String filePath = sc.nextLine();
+        String str1= "D:\\大学学习资料\\大三上学期学习\\分布式系统\\distributed-system-course\\assignment34\\hw3\\dblp_line_processed_chunk_";
+        String str2="_bucket_";
+        String str3=".lson";
+        for (int i = 1; i <= 7; i++) {
+            for (int j = 0; j < 4; j++) {
+                process(str1+i+str2+j+str3);
+            }
+        }
+    }
+
+    public static void process(String filePath) {
+//        Scanner sc = new Scanner(System.in);
+//        String filePath = sc.nextLine();
 //        String filePath = "D:\\大学学习资料\\大三上学期学习\\分布式系统\\作业\\dblp.xml\\dblp_line.lson";
+
 
         PersistentBTree bTree = createPersistentBTree(filePath);
 //        bTree.output();
