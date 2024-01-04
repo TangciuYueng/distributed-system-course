@@ -21,9 +21,9 @@ public class Main {
                 // 向每台服务器发送 桶 数量的请求
                 for (String host: hosts) {
                     for (int i = 0; i < 4; i++) {
-                        final int serverNum = i;
+                        final int chunkNum = i;
                         final int port = 9999 + i;
-                        exec.execute(() -> new RequestThread(serverNum, author, host, port).run());
+                        exec.execute(() -> new RequestThread(chunkNum, author, host, port).run());
                     }
                 }
                 // 需要增加 1. 超时处理 2. 对于冗余数据返回的处理，对于多台服务器中只要有一台查出了结果即可展示
