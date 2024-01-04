@@ -1,12 +1,12 @@
 # 服务器地址和目标目录
-$serverAddress = "root@124.221.224.31"
+$serverAddress = "root@124.220.39.190"
 $targetDirectory = "~"
 
 # 遍历 i 和 j 的所有可能取值
 for ($i=1; $i -le 7; $i++) {
     for ($j=0; $j -le 3; $j++) {
         # 构造文件名
-        $fileName = "dblp_line_processed_chunk_${i}_bucket_${j}_index_tree.ser"
+        $fileName = "dblp_line_processed_chunk_${i}_bucket_${j}.lson"
         
         # 使用 scp 命令传输文件到服务器
         scp "$fileName" "$($serverAddress):$($targetDirectory)"

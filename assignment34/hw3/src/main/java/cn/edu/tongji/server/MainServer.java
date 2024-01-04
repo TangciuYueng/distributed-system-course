@@ -9,7 +9,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MainServer {
-    public static final int COPY_NUM = 4;
+    public static final int COPY_NUM = 5;
     public static final int BUCKET_PER_SERVER = 4;
     public static final int PORT = 9999;
 
@@ -44,7 +44,7 @@ public class MainServer {
             System.out.println("need server num");
             return;
         }
-        // 一个服务器 4 个文件块 开 4 个线程 负责 9999 - 10002 端口进行处理
+        // 一个服务器 5 个文件块 开 5 个线程 负责 9999 - 10003 端口进行处理
         try {
             int serverNum = Integer.parseInt(args[0]);
             try (ExecutorService exec = Executors.newCachedThreadPool()) {
