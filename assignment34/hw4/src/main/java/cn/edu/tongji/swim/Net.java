@@ -1,7 +1,13 @@
 package cn.edu.tongji.swim;
 
 
+import cn.edu.tongji.swim.netEvents.AckEvent;
+import cn.edu.tongji.swim.netEvents.PingEvent;
+import cn.edu.tongji.swim.netEvents.PingReqEvent;
+import cn.edu.tongji.swim.membershipEvents.UpdateEvent;
+import cn.edu.tongji.swim.messages.*;
 import cn.edu.tongji.swim.netEvents.*;
+import cn.edu.tongji.swim.options.UdpOptions;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.greenrobot.eventbus.EventBus;
@@ -50,10 +56,10 @@ public class Net {
         this.udp.maxDgramSize = udpOptions.getMaxDgramSize() == null ? 512 : udpOptions.getMaxDgramSize();
         this.eventBus = new EventBus();
         this.eventBus.register(this);
-        this.run();
+        //this.run();
     }
 
-    private void run() {
+    public boolean listen() {
         InetAddress localhost = null;
 
         try {
@@ -61,7 +67,7 @@ public class Net {
         } catch (UnknownHostException e) {
             e.printStackTrace();
             System.out.println("this machine is not online, net initialize failed");
-            return;
+            return false;
         }
 
         try (ExecutorService exec = Executors.newFixedThreadPool(1)) {
@@ -92,6 +98,8 @@ public class Net {
                     eventBus.post(errorEvent);
                 }
             });
+
+            return true;
         } catch (SocketException e) {
             e.printStackTrace();
             System.out.println(
@@ -99,6 +107,7 @@ public class Net {
                     "on: " + localhost + '\n' +
                     "port: " + udp.port
             );
+            return false;
         }
     }
 
@@ -142,12 +151,12 @@ public class Net {
 
         switch (MessageType.values()[messageType]) {
             case COMPOUND -> onCompound(message, rinfo);
-            case PING -> eventBus.post(new PingEvent(message, rinfo));
-            case PING_REQ -> eventBus.post(new PingReqEvent(message, rinfo));
-            case SYNC -> eventBus.post(new SyncEvent(message, rinfo));
-            case ACK -> eventBus.post(new AckEvent(message, rinfo));
-            case UPDATE -> eventBus.post(new UpdateEvent(message, rinfo));
-            default -> eventBus.post(new UnknownEvent(message, rinfo));
+            case PING -> onPing(message, rinfo);
+            case PING_REQ -> onPingReq(message, rinfo);
+            case SYNC -> onSync(message, rinfo);
+            case ACK -> onAck(message, rinfo);
+            case UPDATE -> onUpdate(message, rinfo);
+            default -> onUnknown(message, rinfo);
         }
     }
 
@@ -184,113 +193,118 @@ public class Net {
         }
     }
 
-    @Subscribe
-    public void onPing(PingEvent event) {
+    public void onPing(byte[] buffer, NetEvent.Rinfo rinfo) {
         try {
-            Message data = swim.getCodec().decode(event.getBuffer(), Message.class);
+            PingData data = swim.getCodec().decode(buffer, PingData.class);
             System.out.println(
                     "received ping message\n" +
-                    "from: " + event.getRinfo().format() + '\n' +
+                    "from: " + rinfo.format() + '\n' +
                     "data: " + data
             );
+
+            eventBus.post(new PingEvent(data.getSeq(), rinfo.getAddress()));
         } catch (IOException e) {
             e.printStackTrace();
             System.out.println(
                     "failed to decode data\n" +
-                    "from: " + event.getRinfo().format() + '\n' +
-                    "length: " + event.getBuffer().length + '\n' +
-                    "buffer: " + Arrays.toString(event.getBuffer())
+                    "from: " + rinfo.format() + '\n' +
+                    "length: " + buffer.length + '\n' +
+                    "buffer: " + Arrays.toString(buffer)
             );
         }
     }
 
-    @Subscribe
-    public void onPingRec(PingReqEvent event) {
+    public void onPingReq(byte[] buffer, NetEvent.Rinfo rinfo) {
         try {
-            Message data = swim.getCodec().decode(event.getBuffer(), Message.class);
+            PingReqData data = swim.getCodec().decode(buffer, PingReqData.class);
             System.out.println(
                     "received pingreq message\n" +
-                    "from: " + event.getRinfo().format() + '\n' +
+                    "from: " + rinfo.format() + '\n' +
                     "data: " + data
             );
+
+            eventBus.post(new PingReqEvent(data.getSeq(), data.getDest(), rinfo.getAddress()));
         } catch (IOException e) {
             e.printStackTrace();
             System.out.println(
                     "failed to decode data\n" +
-                    "from: " + event.getRinfo().format() + '\n' +
-                    "length: " + event.getBuffer().length + '\n' +
-                    "buffer: " + Arrays.toString(event.getBuffer())
+                    "from: " + rinfo.format() + '\n' +
+                    "length: " + buffer.length + '\n' +
+                    "buffer: " + Arrays.toString(buffer)
             );
         }
     }
 
-    @Subscribe
-    public void onSync(SyncEvent event) {
+    public void onSync(byte[] buffer, NetEvent.Rinfo rinfo) {
         try {
-            Message data = swim.getCodec().decode(event.getBuffer(), Message.class);
+            SyncData data = swim.getCodec().decode(buffer, SyncData.class);
             System.out.println(
                     "received sync message\n" +
-                    "from: " + event.getRinfo().format() + '\n' +
+                    "from: " + rinfo.format() + '\n' +
                     "data: " + data
             );
+
+            eventBus.post(new SyncEvent(data.getMember()));
         } catch (IOException e) {
             e.printStackTrace();
             System.out.println(
                     "failed to decode data\n" +
-                    "from: " + event.getRinfo().format() + '\n' +
-                    "length: " + event.getBuffer().length + '\n' +
-                    "buffer: " + Arrays.toString(event.getBuffer())
+                    "from: " + rinfo.format() + '\n' +
+                    "length: " + buffer.length + '\n' +
+                    "buffer: " + Arrays.toString(buffer)
             );
         }
     }
 
-    @Subscribe
-    public void onAck(AckEvent event) {
+    public void onAck(byte[] buffer, NetEvent.Rinfo rinfo) {
         try {
-            Message data = swim.getCodec().decode(event.getBuffer(), Message.class);
+            AckData data = swim.getCodec().decode(buffer, AckData.class);
             System.out.println(
                     "received ack message\n" +
-                    "from: " + event.getRinfo().format() + '\n' +
+                    "from: " + rinfo.format() + '\n' +
                     "data: " + data
             );
+
+            eventBus.post(new AckEvent(data.getSeq(), data.getHost()));
         } catch (IOException e) {
             e.printStackTrace();
             System.out.println(
                     "failed to decode data\n" +
-                    "from: " + event.getRinfo().format() + '\n' +
-                    "length: " + event.getBuffer().length + '\n' +
-                    "buffer: " + Arrays.toString(event.getBuffer())
+                    "from: " + rinfo.format() + '\n' +
+                    "length: " + buffer.length + '\n' +
+                    "buffer: " + Arrays.toString(buffer)
             );
         }
     }
 
-    @Subscribe
-    public void onUpdate(UpdateEvent event) {
+    public void onUpdate(byte[] buffer, NetEvent.Rinfo rinfo) {
         try {
-            Message data = swim.getCodec().decode(event.getBuffer(), Message.class);
+            UpdateData data = swim.getCodec().decode(buffer, UpdateData.class);
             System.out.println(
                     "received update message\n" +
-                    "from: " + event.getRinfo().format() + '\n' +
+                    "from: " + rinfo.format() + '\n' +
                     "data: " + data
             );
+
+            eventBus.post(new UpdateEvent(data.getMember()));
         } catch (IOException e) {
             e.printStackTrace();
             System.out.println(
                     "failed to decode data\n" +
-                    "from: " + event.getRinfo().format() + '\n' +
-                    "length: " + event.getBuffer().length + '\n' +
-                    "buffer: " + Arrays.toString(event.getBuffer())
+                    "from: " + rinfo.format() + '\n' +
+                    "length: " + buffer.length + '\n' +
+                    "buffer: " + Arrays.toString(buffer)
             );
         }
     }
 
-    @Subscribe
-    public void onUnknown(UnknownEvent event) {
+    public void onUnknown(byte[] buffer, NetEvent.Rinfo rinfo) {
         System.out.println(
                 "received unknown buffer\n" +
-                "from: " + event.getRinfo().format() + '\n' +
-                "buffer: " + Arrays.toString(event.getBuffer())
+                "from: " + rinfo.format() + '\n' +
+                "buffer: " + Arrays.toString(buffer)
         );
+        eventBus.post(new UnknownEvent(buffer, rinfo));
     }
 
     //外部调用

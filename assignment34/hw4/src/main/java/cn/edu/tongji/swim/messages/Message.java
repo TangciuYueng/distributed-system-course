@@ -1,5 +1,6 @@
-package cn.edu.tongji.swim;
+package cn.edu.tongji.swim.messages;
 
+import cn.edu.tongji.swim.MessageType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -7,5 +8,5 @@ import lombok.Data;
 @AllArgsConstructor
 public class Message {
     private MessageType type;
-    private Member data;
+    private Object data;
 }

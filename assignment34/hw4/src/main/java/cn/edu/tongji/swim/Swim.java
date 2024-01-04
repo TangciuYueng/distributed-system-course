@@ -1,12 +1,15 @@
 package cn.edu.tongji.swim;
 
+import cn.edu.tongji.swim.membershipEvents.ChangeEvent;
+import cn.edu.tongji.swim.membershipEvents.UpdateEvent;
+import cn.edu.tongji.swim.options.SwimOptions;
+import cn.edu.tongji.swim.swimEvents.ErrorEvent;
 import lombok.Data;
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
 
-import javax.security.auth.callback.Callback;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
-import java.util.TimerTask;
 
 @Data
 public class Swim {
@@ -17,6 +20,7 @@ public class Swim {
     private Membership membership;
     private Net net;
     private SwimState state;
+    private EventBus eventBus;
     private int joinTimeout;
     private int joinCheckInterval;
     private List<EventListener> changeListeners;
@@ -39,7 +43,7 @@ public class Swim {
 
     public Swim(SwimOptions opts) {
         this.opts = opts;
-
+        this.eventBus = new EventBus();
         this.codec = new Codec(opts.getCodec());
 //        this.disseminator = new Disseminator(opts.disseminationFactor, this, opts.local.host);
 //        this.failureDetector = new FailureDetector(opts.interval, opts.pingTimeout, opts.pingReqTimeout,
@@ -57,20 +61,34 @@ public class Swim {
 //        this.updateListeners = new ArrayList<>();
     }
 
-    public void bootstrap(List<String> host, Callback callback) {
-        if (state != SwimState.STOPPED) {
-            CustomExceptions.InvalidStateException err = new CustomExceptions.InvalidStateException("Invalid state: " + state + ", expected: STOPPED");
-            handleError(err, callback);
-            return;
-        }
+    @Subscribe
+    public void onChange(ChangeEvent event) {
+        eventBus.post(new cn.edu.tongji.swim.swimEvents.ChangeEvent());
     }
 
-    private void handleError(CustomExceptions.InvalidStateException err, Callback callback) {
-        if (callback != null) {
-//            callback.onError(err);
-        } else {
-            // 执行 SwimEventType.ERROR 对应的函数
+    @Subscribe
+    public void onUpdate(UpdateEvent event) {
+        eventBus.post(new cn.edu.tongji.swim.swimEvents.UpdateEvent());
+    }
+
+    public void bootstrap(List<String> host) {
+        if (state != SwimState.STOPPED) {
+            CustomExceptions.InvalidStateException err = new CustomExceptions.InvalidStateException("Invalid state: " + state + ", expected: STOPPED");
+            callback(err);
+            return;
         }
 
+        if (!net.listen()) {
+            CustomExceptions.ListenFailedException err = new CustomExceptions.ListenFailedException("Host: " + host);
+            callback(err);
+            return;
+        }
+        else {
+            failureDetector.start();
+            membership.start();
+            disseminator.start();
+            membership.getEventBus().register(this);
+            state = SwimState.STARTED;
+        }
     }
 }

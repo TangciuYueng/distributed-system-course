@@ -3,9 +3,12 @@ package cn.edu.tongji.swim;
 import cn.edu.tongji.swim.failureDetectorEvents.SuspectEvent;
 import cn.edu.tongji.swim.membershipEvents.ChangeEvent;
 import cn.edu.tongji.swim.membershipEvents.DropEvent;
+import cn.edu.tongji.swim.membershipEvents.UpdateEvent;
+import cn.edu.tongji.swim.messages.Message;
+import cn.edu.tongji.swim.messages.SyncData;
+import cn.edu.tongji.swim.messages.UpdateData;
 import cn.edu.tongji.swim.netEvents.AckEvent;
 import cn.edu.tongji.swim.netEvents.SyncEvent;
-import cn.edu.tongji.swim.netEvents.UpdateEvent;
 import lombok.Data;
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
@@ -53,7 +56,7 @@ public class Membership {
     }
 
     // 将当前对象注册为故障检测器的事件总线和网络事件总线的事件监听器
-    private void start() {
+    public void start() {
         swim.getFailureDetector().getEventBus().register(this);
         swim.getNet().getEventBus().register(this);
 
@@ -112,10 +115,16 @@ public class Membership {
 
     @Subscribe
     public void onAck(AckEvent event) {
+        //这个函数会和FailureDetector.onAck同时触发
+        if (event.getHost() == null)
+            return;
+
         String host = event.getHost();
         Member member = hostToMember.getOrDefault(host, null);
         if (member != null && member.getState() == Member.State.SUSPECT) {
-            swim.getNet().sendMessage(new Message(MessageType.UPDATE, member.getCopy()), host);
+            UpdateData data = new UpdateData(member.getCopy());
+            Message message = new Message(MessageType.UPDATE, data);
+            swim.getNet().sendMessage(message, host);
         }
     }
 
@@ -156,29 +165,34 @@ public class Membership {
 
     @Subscribe
     private void onSync(SyncEvent event) {
-        var data = event.getData();
-        String host = data.getHost();
+        Member member = event.getMember();
+        String host = member.getHost();
 
-        updateAlive(data);
+        updateAlive(member);
 
         // 获取本地和 faulty 的所有
         List<Member> allMembers = all(true, true);
         List<Message> messages = new ArrayList<>();
 
-        for (Member data1 : allMembers) {
-            Message message = new Message(MessageType.UPDATE, data1);
+        for (Member data : allMembers) {
+            Message message = new Message(MessageType.UPDATE, new UpdateData(data));
             messages.add(message);
         }
+
         // 发送多条 msg
         swim.getNet().sendMessages(messages, host);
     }
 
     private void sync(List<String> hosts) {
-        List<Message> messages = List.of(new Message(MessageType.SYNC, local.getCopy()));
+        SyncData syncData = new SyncData(local.getCopy());
+        Message syncMessage = new Message(MessageType.SYNC, syncData);
+        List<Message> messages = new ArrayList<>(List.of(syncMessage));
 
-        all(false, true).forEach(member ->
-            messages.add(new Message(MessageType.UPDATE, member))
-        );
+        all(false, true).forEach(member -> {
+            UpdateData updateData = new UpdateData(member);
+            Message updateMessage = new Message(MessageType.UPDATE, updateData);
+            messages.add(updateMessage);
+        });
 
         hosts.forEach(host ->
             swim.getNet().sendMessages(messages, host)
@@ -187,23 +201,21 @@ public class Membership {
 
     @Subscribe
     private void onUpdate(UpdateEvent event) {
-        var data = event.getData();
+        Member member = event.getMember();
 
-        System.out.println("received update" + data);
+        System.out.println("received update" + member);
 
-        if (data.getState() == Member.State.ALIVE) {
-            updateAlive(data);
-        } else if (data.getState() == Member.State.SUSPECT) {
-            updateSuspect(data);
-        } else if (data.getState() == Member.State.FAULTY) {
-            updateFaulty(data);
+        switch (member.getState()) {
+            case ALIVE -> updateAlive(member);
+            case SUSPECT -> updateSuspect(member);
+            case FAULTY -> updateFaulty(member);
         }
     }
 
     void updateAlive(Member data) {
-        if (data.getHost() == local.getHost()) {
+        if (Objects.equals(data.getHost(), local.getHost())) {
             if (local.incarnate(data, false, preferCurrentMeta)) {
-                eventBus.post(new cn.edu.tongji.swim.membershipEvents.UpdateEvent(local.getCopy()));
+                eventBus.post(new UpdateEvent(local.getCopy()));
             } else {
                 eventBus.post(new DropEvent(data));
             }
@@ -228,17 +240,17 @@ public class Membership {
                 eventBus.post(new ChangeEvent(hostToMember.get(data.getHost()).getCopy()));
             }
 
-            eventBus.post(new cn.edu.tongji.swim.membershipEvents.UpdateEvent(hostToMember.get(data.getHost()).getCopy()));
+            eventBus.post(new UpdateEvent(hostToMember.get(data.getHost()).getCopy()));
         } else {
             eventBus.post(new DropEvent(data));
         }
     }
 
     void updateSuspect(Member data) {
-        if (data.getHost() == local.getHost()) {
+        if (Objects.equals(data.getHost(), local.getHost())) {
             eventBus.post(new DropEvent(data));
             local.incarnate(data, true, preferCurrentMeta);
-            eventBus.post(new cn.edu.tongji.swim.membershipEvents.UpdateEvent(local.getCopy()));
+            eventBus.post(new UpdateEvent(local.getCopy()));
             return;
         }
 
@@ -262,14 +274,14 @@ public class Membership {
                 eventBus.post(new ChangeEvent(hostToMember.get(data.getHost()).getCopy()));
             }
 
-            eventBus.post(new cn.edu.tongji.swim.membershipEvents.UpdateEvent(hostToMember.get(data.getHost()).getCopy()));
+            eventBus.post(new UpdateEvent(hostToMember.get(data.getHost()).getCopy()));
         } else {
             eventBus.post(new DropEvent(data));
         }
     }
 
     void updateFaulty(Member data) {
-        if (data.getHost() == local.getHost()) {
+        if (Objects.equals(data.getHost(), local.getHost())) {
             eventBus.post(new DropEvent(data));
             local.incarnate(data, true, preferCurrentMeta);
             return;
@@ -282,7 +294,7 @@ public class Membership {
             hostToIterable.remove(data.getHost());
 
             eventBus.post(new ChangeEvent(data));
-            eventBus.post(new cn.edu.tongji.swim.membershipEvents.UpdateEvent(data));
+            eventBus.post(new UpdateEvent(data));
         } else {
             eventBus.post(new DropEvent(data));
         }

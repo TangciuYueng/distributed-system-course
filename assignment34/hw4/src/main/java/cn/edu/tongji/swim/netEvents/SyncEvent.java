@@ -7,5 +7,5 @@ import lombok.Data;
 @Data
 @AllArgsConstructor
 public class SyncEvent {
-    private Member data;
+    private Member member;
 }

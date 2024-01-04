@@ -1,4 +1,4 @@
-package cn.edu.tongji.swim.membershipEvents;
+package cn.edu.tongji.swim.messages;
 
 import cn.edu.tongji.swim.Member;
 import lombok.AllArgsConstructor;
@@ -6,6 +6,6 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
-public class UpdateEvent {
+public class SyncData {
     private Member member;
 }

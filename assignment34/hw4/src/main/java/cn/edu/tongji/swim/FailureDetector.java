@@ -1,8 +1,16 @@
 package cn.edu.tongji.swim;
 
+import cn.edu.tongji.swim.netEvents.AckEvent;
+import cn.edu.tongji.swim.netEvents.PingEvent;
+import cn.edu.tongji.swim.netEvents.PingReqEvent;
+import cn.edu.tongji.swim.failureDetectorEvents.SuspectEvent;
+import cn.edu.tongji.swim.messages.*;
+import cn.edu.tongji.swim.options.FDOptions;
 import lombok.Data;
 import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
 
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,45 +27,31 @@ public class FailureDetector {
     private final int pingTimeout;
     private final int pingReqTimeout;
     private final int pingReqGroupSize;
-
-    private int seq = 0;
+    private int seq;
     private Timer tickTimer;
-    private final ConcurrentMap<Integer, Long> seqToTimeout = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Integer, Timer> seqToTimeout = new ConcurrentHashMap<>();
     private final ConcurrentMap<Integer, Runnable> seqToCallback = new ConcurrentHashMap<>();
 
-    public static final int DEFAULT_INTERVAL = 20;
-    public static final int DEFAULT_PING_TIMEOUT = 4;
-    public static final int DEFAULT_PING_REQ_TIMEOUT = 12;
-    public static final int DEFAULT_PING_REQ_GROUP_SIZE = 3;
+    private static final int DEFAULT_INTERVAL = 20;
+    private static final int DEFAULT_PING_TIMEOUT = 4;
+    private static final int DEFAULT_PING_REQ_TIMEOUT = 12;
+    private static final int DEFAULT_PING_REQ_GROUP_SIZE = 3;
 
     public static final String SUSPECT_EVENT = "suspect";
     private final ExecutorService executorService = Executors.newCachedThreadPool();
-    public static class Default {
-        public static final int interval = 20;
-        public static final int pingTimeout = 4;
-        public static final int pingReqTimeout = 12;
-        public static final int pingReqGroupSize = 3;
-    }
 
     // 构造函数
-    public FailureDetector(Swim swim, int interval, int pingTimeout, int pingReqTimeout, int pingReqGroupSize) {
+    public FailureDetector(Swim swim, FDOptions fdOptions) {
         this.swim = swim;
         this.eventBus = new EventBus();
-        this.interval = interval != 0 ? interval : Default.interval;
-        this.pingTimeout = pingTimeout != 0 ? pingTimeout : Default.pingTimeout;
-        this.pingReqTimeout = pingReqTimeout != 0 ? pingReqTimeout : Default.pingReqTimeout;
-        this.pingReqGroupSize = pingReqGroupSize != 0 ? pingReqGroupSize : Default.pingReqGroupSize;
+        this.interval = fdOptions.getInterval() == null ? DEFAULT_INTERVAL : fdOptions.getInterval();
+        this.pingTimeout = fdOptions.getPingTimeout() == null ? DEFAULT_PING_TIMEOUT : fdOptions.getPingTimeout();
+        this.pingReqTimeout = fdOptions.getPingReqTimeout() == null ? DEFAULT_PING_REQ_TIMEOUT : fdOptions.getPingReqTimeout();
+        this.pingReqGroupSize = fdOptions.getPingReqGroupSize() == null ? DEFAULT_PING_REQ_GROUP_SIZE : fdOptions.getPingReqGroupSize();
     }
 
-    // 启动故障检测器，监听网络事件，并开始定时执行 ping 操作。
     public void start() {
-        // 监听网络事件
-        swim.getNet().on(Net.EventType.Ping, this::onPing);
-        // swim.getNet().on(Net.EventType.Ping, this::onPing);表示在Net的Ping事件上注册onPing方法，确保在事件触发时onPing方法能够在当前FailureDetector实例上执行。
-        swim.getNet().on(Net.EventType.PingReq, this::onPingReq);
-        swim.getNet().on(Net.EventType.Ack, this::onAck);
-
-        // 定时执行 ping 操作
+        this.swim.getNet().getEventBus().register(this);
         tick();
     }
 
@@ -65,12 +59,11 @@ public class FailureDetector {
         // 如果定时器不为null，则取消定时器
         if (tickTimer != null) {
             tickTimer.cancel();
+            tickTimer = null;
         }
 
         // 移除网络事件监听器
-        swim.getNet().removeListener(Net.EventType.Ping, this::onPing);
-        swim.getNet().removeListener(Net.EventType.PingReq, this::onPingReq);
-        swim.getNet().removeListener(Net.EventType.Ack, this::onAck);
+        swim.getNet().getEventBus().unregister(this);
 
         // 清空存储定时器和回调的集合
         seqToTimeout.clear();
@@ -97,143 +90,119 @@ public class FailureDetector {
     }
 
     private void pingMember(Member member) {
-        // 获取当前对象的引用
-        final FailureDetector self = this;
-
         // 获取当前序列号
-        final int seq = self.seq;
-
-        // 如果成员为空，则直接返回
-        if (member == null) {
-            return;
-        }
+        final int oldSeq = seq;
 
         // 递增序列号
-        self.seq += 1;
+        seq += 1;
 
         // 使用定时器，在超时后执行 receiveTimeout 操作
-        self.seqToTimeout.put(seq, self.scheduleTimeout(seq, new Runnable() {
-            @Override
-            public void run() {
-                self.clearSeq(seq);
-                self.pingReq(member);
-            }
-        }, self.pingTimeout));
+        Timer timer = new Timer();
+        setTimeout(timer, () -> {
+            clearSeq(oldSeq);
+            pingReq(member);
+        }, pingTimeout);
+        seqToTimeout.put(oldSeq, timer);
 
         // 使用网络模块发送 Ping 消息
-        swim.getNet().sendMessage(MessageType.Ping, seq, member.getHost());
+        PingData data = new PingData(seq);
+        Message message = new Message(MessageType.PING, data);
+        swim.getNet().sendMessage(message, member.getHost());
     }
 
     private void pingReq(Member member) {
-        // 获取当前对象的引用
-        final FailureDetector self = this;
-
         // 获取 pingReq 目标的随机成员列表
-        Member[] relayMembers = self.swim.getMembership().random(self.pingReqGroupSize);
+        List<String> relayMembers = swim.getMembership().random(pingReqGroupSize);
 
         // 如果随机成员列表为空，直接返回
-        if (relayMembers.length == 0) {
+        if (relayMembers.size() == 0) {
             return;
         }
 
-        // 定义超时定时器
-        TimerTask timeoutTask = new TimerTask() {
-            @Override
-            public void run() {
-                // 触发 SUSPECT 事件
-                self.swim.emit(FailureDetector.SUSPECT_EVENT, member);
-            }
-        };
-
-        // 启动超时定时器
-        Timer timeoutTimer = new Timer(true);
-        timeoutTimer.schedule(timeoutTask, self.pingReqTimeout);
+        // 定义、启动超时定时器
+        Timer timeout = new Timer();
+        setTimeout(timeout, () -> {
+            eventBus.post(new SuspectEvent(member));
+        }, pingReqTimeout);
 
         // 遍历随机成员列表，执行 pingReqThroughMember 操作
-        for (Member relayMember : relayMembers) {
-            self.pingReqThroughMember(member, relayMember, () -> {
-                // 清除超时定时器
-                timeoutTimer.cancel();
-            });
+        for (String relayMember : relayMembers) {
+            // 清除超时定时器
+            pingReqThroughMember(member.getHost(), relayMember, timeout::cancel);
         }
     }
 
-    private void pingReqThroughMember(Member member, Member relayMember, Runnable callback) {
-        // 获取当前对象的引用
-        final FailureDetector self = this;
-
+    private void pingReqThroughMember(String memberHost, String relayMemberHost, Runnable callback) {
         // 获取当前序列号
-        final int seq = self.seq;
+        final int oldSeq = seq;
 
         // 递增序列号
-        self.seq += 1;
+        seq += 1;
 
         // 使用定时器，在超时后执行 receiveTimeout 操作
-        self.seqToTimeout.put(seq, self.scheduleTimeout(seq, new Runnable() {
-            @Override
-            public void run() {
-                self.clearSeq(seq);
-            }
-        }, self.pingReqTimeout));
+        Timer timer = new Timer();
+        setTimeout(timer, () -> {
+            clearSeq(oldSeq);
+        }, pingReqTimeout);
+        seqToTimeout.put(oldSeq, timer);
 
         // 使用回调函数，在收到 pingReqAck 时执行回调操作
-        self.seqToCallback.put(seq, new Runnable() {
-            @Override
-            public void run() {
-                self.clearSeq(seq);
-                callback.run();
-            }
+        seqToCallback.put(oldSeq, () -> {
+            clearSeq(oldSeq);
+            callback.run();
         });
 
         // 使用网络模块发送 PingReq 消息
-        swim.getNet().sendMessage(MessageType.PingReq, seq, relayMember.getHost(), member.getHost());
+        PingReqData data = new PingReqData(oldSeq, memberHost);
+        Message message = new Message(MessageType.PING_REQ, data);
+        swim.getNet().sendMessage(message, relayMemberHost);
     }
 
-    private void onPing(MessageData data, String host) {
-        // Implementation for onPing
-        // ...
-
+    @Subscribe
+    private void onPing(PingEvent event) {
         // 使用网络模块发送 Ack 消息
-        swim.getNet().sendMessage(MessageType.Ack, data.getSeq(), host);
+        AckData data = new AckData(event.getSeq(), event.getHost());
+        Message message = new Message(MessageType.ACK, data);
+        swim.getNet().sendMessage(message, event.getHost());
     }
 
-    private void onPingReq(MessageData data, String host) {
-        // Implementation for onPingReq
-        // ...
-
-        // 获取当前对象的引用
-        final FailureDetector self = this;
-
+    @Subscribe
+    private void onPingReq(PingReqEvent event) {
         // 获取当前序列号
-        final int seq = self.seq;
+        final int oldSeq = seq;
 
         // 递增序列号
-        self.seq += 1;
+        seq += 1;
 
         // 使用定时器，在超时后执行 receiveTimeout 操作
-        self.seqToTimeout.put(seq, self.scheduleTimeout(seq, () -> self.clearSeq(seq), self.pingTimeout));
+        Timer timer = new Timer();
+        setTimeout(timer, () -> {
+            clearSeq(oldSeq);
+        }, pingTimeout);
+        seqToTimeout.put(oldSeq, timer);
 
         // 使用回调函数，在收到 pingReqAck 时执行回调操作
-        self.seqToCallback.put(seq, () -> {
-            self.clearSeq(seq);
-
-            // 使用线程池提交任务，模拟异步回调
-            executorService.submit(() -> {
-                // 使用网络模块发送 Ack 消息
-                swim.getNet().sendMessage(MessageType.Ack, data.getSeq(), host);
-            });
+        seqToCallback.put(oldSeq, () -> {
+            clearSeq(oldSeq);
+            AckData data = new AckData(event.getSeq(), null);
+            Message message = new Message(MessageType.ACK, data);
+            swim.getNet().sendMessage(message, event.getHost());
         });
 
         // 使用网络模块发送 Ping 消息
-        swim.getNet().sendMessage(MessageType.Ping, seq, data.getDestination());
+        PingData data = new PingData(event.getSeq());
+        Message message = new Message(MessageType.PING, data);
+        swim.getNet().sendMessage(message, event.getDest());
     }
 
-    private void onAck(MessageData data) {
-        // Implementation for onAck
-        // ...
+    @Subscribe
+    private void onAck(AckEvent event) {
+        //这个函数会和Membership.onAck同时触发
+        if (event.getSeq() == null)
+            return;
 
         // 获取回调函数
-        Runnable callback = seqToCallback.get(data.getSeq());
+        Runnable callback = seqToCallback.get(event.getSeq());
 
         // 如果回调函数不为null，使用线程池提交任务，在下一个线程中执行回调
         if (callback != null) {
@@ -241,49 +210,22 @@ public class FailureDetector {
         }
 
         // 清除序列号相关的数据
-        clearSeq(data.getSeq());
+        clearSeq(event.getSeq());
     }
 
-    private long scheduleTimeout(int seq) {
+    private void setTimeout(Timer timer, Runnable task, int timeout) {
         TimerTask timerTask = new TimerTask() {
             @Override
             public void run() {
-                clearSeq(seq);
+                task.run();
             }
         };
 
-        long delay = seq == 0 ? 0 : pingTimeout;
-        tickTimer.schedule(timerTask, delay);
-
-        return System.currentTimeMillis() + delay;
+        timer.schedule(timerTask, timeout);
     }
 
     private void clearSeq(int seq) {
         seqToTimeout.remove(seq);
         seqToCallback.remove(seq);
-    }
-
-    public static class MessageType {
-        public static final int Ping = 1;
-        public static final int PingReq = 2;
-        public static final int Ack = 3; // 添加 Ack 类型
-        // ... (add more as needed)
-    }
-
-    public static class MessageData {
-        // Define message data structure
-        private int seq; // 例如，假设 MessageData 包含一个序列号字段
-
-        // 构造函数，用于创建 MessageData 实例
-        public MessageData(int seq) {
-            this.seq = seq;
-        }
-
-        // 获取序列号的方法
-        public int getSeq() {
-            return seq;
-        }
-
-        // ... (可以添加其他字段和方法)
     }
 }

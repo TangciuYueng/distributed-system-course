@@ -1,7 +1,6 @@
 package cn.edu.tongji.swim.test;
 
 import cn.edu.tongji.swim.netEvents.NetEvent;
-import cn.edu.tongji.swim.netEvents.PingEvent;
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 

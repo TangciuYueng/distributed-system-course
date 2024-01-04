@@ -2,12 +2,10 @@ package cn.edu.tongji.swim;
 
 import cn.edu.tongji.swim.membershipEvents.ChangeEvent;
 import cn.edu.tongji.swim.membershipEvents.UpdateEvent;
-import lombok.Data;
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.*;
 
 public class Disseminator {
@@ -100,8 +98,7 @@ public class Disseminator {
 
     @Subscribe
     public void onUpdate(UpdateEvent event) {
-        var data = event.getData();
-        var update = new Update(data);
+        Update update = new Update(event.getMember());
         removeUpdate(update);
         addUpdate(update);
     }

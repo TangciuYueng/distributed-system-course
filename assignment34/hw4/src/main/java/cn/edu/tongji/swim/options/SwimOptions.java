@@ -1,5 +1,7 @@
-package cn.edu.tongji.swim;
+package cn.edu.tongji.swim.options;
 
+import cn.edu.tongji.swim.Swim;
+import cn.edu.tongji.swim.options.UdpOptions;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
