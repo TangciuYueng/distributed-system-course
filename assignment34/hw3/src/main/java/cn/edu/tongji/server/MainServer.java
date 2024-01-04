@@ -5,34 +5,41 @@ import cn.edu.tongji.tools.PersistentBTree;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MainServer {
     private static final String FILE_PREFIX = "dblp_line_processed_chunk_";
     private static final String FILE_POSTFIX = "_index_tree.ser";
+    private static final String EXT = ".lson";
     private static final int BUCKET_PER_SERVER = 4;
     private static final int PORT = 9999;
 
-    public static void createServerThread(int serverNum, int port) {
+    public static void createServerThread(int chunkNum, int port) {
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             PersistentBTree<String, Long>[] trees = new PersistentBTree[BUCKET_PER_SERVER];
+            List<BufferedReader> bufferReaders = new ArrayList<>();
 
             // 前置工作 读取索引
             for (int i = 0; i < BUCKET_PER_SERVER; i++) {
                 final long startTime = System.currentTimeMillis();
-                trees[i] = PersistentBTree.loadFromFile( FILE_PREFIX + (serverNum + 1) + "_bucket_" + i + FILE_POSTFIX);
-                System.out.println("块" + (serverNum + 1) + "读取" + i + "号桶索引用时：" + ((double) (System.currentTimeMillis() - startTime) / 1000) + "s");
+                trees[i] = PersistentBTree.loadFromFile( FILE_PREFIX + (chunkNum + 1) + "_bucket_" + i + FILE_POSTFIX);
+                System.out.println("块" + (chunkNum + 1) + "读取" + i + "号桶索引用时：" + ((double) (System.currentTimeMillis() - startTime) / 1000) + "s");
+
+                BufferedReader inFromLson = new BufferedReader(new FileReader(FILE_PREFIX + (chunkNum + 1) + "_bucket_" + i + EXT));
+                bufferReaders.add(inFromLson);
             }
 
             while (true) {
-                System.out.println("Server " + (serverNum + 1) + " Waiting on Port " + port + "...");    //阻塞等待连接
+                System.out.println("Server " + " Waiting on Port " + port + "...");    //阻塞等待连接
                 Socket connectionSocket = serverSocket.accept();  //阻塞等待连接
 
                 System.out.println("Welcome Connection From " + connectionSocket.getInetAddress());  //连接成功
                 DataInputStream inFromClient = new DataInputStream(connectionSocket.getInputStream());
                 final String author = inFromClient.readUTF();  //读取作者名
-                new DataSearchThread(connectionSocket, author, trees).run();  //创建服务对象并运行主过程
+                new DataSearchThread(connectionSocket, author, trees, bufferReaders, BUCKET_PER_SERVER).run();  //创建服务对象并运行主过程
 
                 System.out.println(connectionSocket.getInetAddress() + " disconnected");  //断开连接，重新等待
             }

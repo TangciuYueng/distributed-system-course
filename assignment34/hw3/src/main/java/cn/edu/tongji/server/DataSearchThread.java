@@ -1,42 +1,62 @@
 package cn.edu.tongji.server;
 
 import cn.edu.tongji.tools.PersistentBTree;
+import lombok.AllArgsConstructor;
 
-import static cn.edu.tongji.server.Main.BUCKET_PER_SERVER;
-import static cn.edu.tongji.tools.Query.customHashFunction;
-
+import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 
+@AllArgsConstructor
 public class DataSearchThread implements Runnable {
     private final Socket connectionSocket;
     private final String author;
     private final PersistentBTree<String, Long>[] trees;
-
-    public DataSearchThread(final Socket connectionSocket, final String author, final PersistentBTree<String, Long>[] trees) {
-        this.connectionSocket = connectionSocket;
-        this.author = author;
-        this.trees = trees;
-    }
+    private final List<BufferedReader> bufferedReaders;
+    private final int bucketPerChunk;
 
     @Override
     public void run() {
         try {
             DataOutputStream outToClient = new DataOutputStream(connectionSocket.getOutputStream());
-            final int bucketNum = customHashFunction(author) % BUCKET_PER_SERVER;
+            final int bucketNum = customHashFunction(author) % bucketPerChunk;
+            // 找到文件指针
             Long pointer = trees[bucketNum].search(author);
 
+            // 找不到
             if (pointer == null) {
                 outToClient.writeBoolean(false);
                 return;
             }
 
+            BufferedReader reader = bufferedReaders.get(bucketNum);
+            reader.skip(pointer);
+            String data = reader.readLine();
+            // 找到信息
             outToClient.writeBoolean(true);
-            outToClient.writeInt(bucketNum);
-            outToClient.writeLong(pointer);
+            // 发送字符串长度与字节数组
+            byte[] dataBytes = data.getBytes(StandardCharsets.UTF_8);
+            outToClient.writeInt(dataBytes.length);
+            outToClient.write(dataBytes);
+
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private int customHashFunction(String name) {
+        // 初始化哈希值
+        int hashValue = 0;
+
+        // 遍历姓名中的每个字符
+        for (char ch : name.toCharArray()) {
+            // 将字符的Unicode码值加到哈希值中
+            hashValue += ch;
+        }
+
+        return hashValue;
     }
 }

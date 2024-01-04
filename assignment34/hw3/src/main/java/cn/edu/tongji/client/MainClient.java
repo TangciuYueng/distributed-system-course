@@ -1,84 +1,79 @@
 package cn.edu.tongji.client;
 
-import java.util.Objects;
-import java.util.Scanner;
+import cn.edu.tongji.tools.SearchResult;
+
+import java.util.*;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 public class MainClient {
-    // 服务器列表
-    static String[] hosts = new String[]{"124.221.224.31","124.220.39.190"};
+    static int START_PORT = 9999;
+    // 每个服务器对应的文件块号
+    static Map<String, List<Integer>> hostToChunkNums = new HashMap<>();
+    // 初始化每个服务器对应文件块号
+    public static void initHostToChunkNums() {
+        hostToChunkNums.put("8.130.90.215", new ArrayList<>(Arrays.asList(6, 7, 1, 2)));
+        hostToChunkNums.put("124.221.224.31", new ArrayList<>(Arrays.asList(1, 2, 3, 4, 5)));
+        hostToChunkNums.put("124.220.39.190", new ArrayList<>(Arrays.asList(6, 7, 1, 2, 3)));
+        hostToChunkNums.put("122.51.113.192", new ArrayList<>(Arrays.asList(4, 5, 6, 7, 1)));
+        hostToChunkNums.put("124.221.188.168", new ArrayList<>(Arrays.asList(2, 3, 4, 5)));
+        hostToChunkNums.put("8.130.89.193", new ArrayList<>(Arrays.asList(3, 4, 5, 6)));
+        hostToChunkNums.put("43.142.102.35", new ArrayList<>(Arrays.asList(7, 1, 2, 3)));
+        hostToChunkNums.put("8.130.173.131", new ArrayList<>(Arrays.asList(4, 5, 6, 7)));
+    }
     public static void main(String[] args) {
+        initHostToChunkNums();
+
         while (true) {
             // 分配服务器数量 * 桶数量个数线程
             try (ExecutorService exec = Executors.newFixedThreadPool(7 * 4)) {
+                Scanner scanner = new Scanner(System.in);
                 System.out.print("请输入查询作者名：");
-                final String author = new Scanner(System.in).nextLine();
+                final String author = scanner.nextLine();
+                System.out.print("请输入起始年份，若忽略请输入-1");
+                final int year1 = scanner.nextInt();
+                System.out.print("请输入结束年份，若忽略请输入-1");
+                final int year2 = scanner.nextInt();
 
                 if (Objects.equals(author, "_break")) {
                     return;
                 }
+
+                List<Future<SearchResult>> futures = new ArrayList<>();
+
                 // 向每台服务器发送 桶 数量的请求
-                for (String host: hosts) {
-                    for (int i = 0; i < 4; i++) {
-                        final int serverNum = i;
-                        final int port = 9999 + i;
-                        // 执行任务并获取一个 Future 对象
-                        Future<?> future = exec.submit(() -> new RequestThreadClient(serverNum, author, host, port).run());
-                        // 超时处理
-                        try {
-                            // 等待线程完成，超时时间设置为 10 秒
-                            future.get(10, TimeUnit.SECONDS);
-                        } catch (Exception e) {
-                            // 处理超时：取消线程
-                            future.cancel(true);
-                        }
+                for (Map.Entry<String, List<Integer>> entry: hostToChunkNums.entrySet()) {
+                    String address = entry.getKey();
+                    List<Integer> chunkNums = entry.getValue();
+                    int portOffsest = 0;
+                    for (int chunkNum: chunkNums) {
+                        int port = START_PORT + portOffsest;
+                        Future<SearchResult> future = exec.submit(() -> new RequestThread(chunkNum, author, address, port).call());
+                        futures.add(future);
+                        portOffsest++;
                     }
                 }
-//                for (String host : hosts) {
-//                    // 用于标记是否在其中一个线程中找到了数据
-//                    boolean dataFound = false;
-//
-//                    for (int i = 0; i < 4; i++) {
-//                        final int serverNum = i;
-//                        final int port = 9999 + i;
-//
-//                        // 执行任务并获取一个 Future 对象
-//                        Future<Boolean> future = exec.submit(() -> new RequestThreadClient(serverNum, author, host, port).run());
-//
-//                        try {
-//                            // 等待线程完成，超时时间设置为 10 秒
-//                            Boolean result = future.get(10, TimeUnit.SECONDS);
-//
-//                            // 检查线程是否已经完成并且找到了数据
-//                            if (!future.isDone() || (future.isDone() && result)) {
-//                                dataFound = true;
-//                                // 处理其他线程不再等待的情况
-//                                for (Future<?> otherFuture : exec.invokeAll(exec.shutdownNow())) {
-//                                    otherFuture.cancel(true);
-//                                }
-//                                break;
-//                            }
-//                        } catch (Exception e) {
-//                            // 处理超时或其他异常：取消线程
-//                            future.cancel(true);
-//                        }
-//                    }
-//
-//                    if (dataFound) {
-//                        // 在这里处理找到数据的情况
-//                        System.out.println("在某个服务器上找到了数据！");
-//                        break; // 跳出主循环，程序结束
-//                    } else {
-//                        // 在这里处理未找到数据的情况
-//                        System.out.println("在所有服务器上均未找到数据。");
-//                    }
-//                }
 
-                // 需要增加 对于冗余数据返回的处理，对于多台服务器中只要有一台查出了结果即可展示
-                // 服务器上的块的排序
+                SearchResult shortestTimeResult = null;
+                double shortestTime = Double.MAX_VALUE;
+                // 等待每个线程的结果，并获取第一个为true的SearchResult
+                for (Future<SearchResult> future : futures) {
+                    try {
+                        SearchResult result = future.get();
+                        if (result != null && result.getFound()) {
+                            double time = result.getTime();
+                            if (time < shortestTime) {
+                                shortestTime = time;
+                                shortestTimeResult = result;
+                            }
+                        }
+                    } catch (InterruptedException | ExecutionException e) {
+                        e.printStackTrace();
+                    }
+                }
+                System.out.println("搜索结果：" + shortestTimeResult.getData() + "用时" + shortestTimeResult.getTime());
 
             } catch(Exception e){
                 e.printStackTrace();
