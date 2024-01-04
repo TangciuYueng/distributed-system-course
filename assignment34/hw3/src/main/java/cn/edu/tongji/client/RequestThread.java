@@ -4,7 +4,6 @@ import lombok.AllArgsConstructor;
 
 import java.io.*;
 import java.net.Socket;
-import static cn.edu.tongji.server.MainServer.PORT;
 
 @AllArgsConstructor
 public class RequestThread implements Runnable {
