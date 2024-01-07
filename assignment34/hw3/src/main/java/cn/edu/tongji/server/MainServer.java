@@ -33,15 +33,19 @@ public class MainServer {
 
             while (true) {
                 System.out.println("Server " + " Waiting on Port " + port + "...");    //阻塞等待连接
-                Socket connectionSocket = serverSocket.accept();  //阻塞等待连接
-
-                System.out.println("Welcome Connection From " + connectionSocket.getInetAddress());  //连接成功
-                DataInputStream inFromClient = new DataInputStream(connectionSocket.getInputStream());
-                final String author = inFromClient.readUTF();  //读取作者名
-                new DataSearchThread(connectionSocket, author, trees, files, BUCKET_PER_SERVER).run();  //创建服务对象并运行主过程
-
-                System.out.println(connectionSocket.getInetAddress() + " disconnected");  //断开连接，重新等待
-                inFromClient.close();
+                try {
+                    Socket connectionSocket = serverSocket.accept();  //阻塞等待连接
+                    System.out.println("Welcome Connection From " + connectionSocket.getInetAddress());  //连接成功
+                    try (DataInputStream inFromClient = new DataInputStream(connectionSocket.getInputStream())) {
+                        final String author = inFromClient.readUTF();  //读取作者名
+                        new DataSearchThread(connectionSocket, author, trees, files, BUCKET_PER_SERVER).run();  //创建服务对象并运行主过程
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    System.out.println(connectionSocket.getInetAddress() + " disconnected");  //断开连接，重新等待
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();

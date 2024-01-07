@@ -3,14 +3,12 @@ package cn.edu.tongji.server;
 import cn.edu.tongji.tools.PersistentBTree;
 import lombok.AllArgsConstructor;
 
-import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.RandomAccess;
 
 @AllArgsConstructor
 public class DataSearchThread implements Runnable {
@@ -22,8 +20,7 @@ public class DataSearchThread implements Runnable {
 
     @Override
     public void run() {
-        try {
-            DataOutputStream outToClient = new DataOutputStream(connectionSocket.getOutputStream());
+        try (DataOutputStream outToClient = new DataOutputStream(connectionSocket.getOutputStream())) {
             final int bucketNum = customHashFunction(author) % bucketPerChunk;
             // 找到文件指针
             Long pointer = trees[bucketNum].search(author);
