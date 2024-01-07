@@ -35,6 +35,8 @@ public class DataSearchThread implements Runnable {
             BufferedReader reader = bufferedReaders.get(bucketNum);
             reader.skip(pointer);
             String data = reader.readLine();
+            // 指针回到 mark 标记的位置
+            reader.reset();
             // 找到信息
             outToClient.writeBoolean(true);
             // 发送字符串长度与字节数组

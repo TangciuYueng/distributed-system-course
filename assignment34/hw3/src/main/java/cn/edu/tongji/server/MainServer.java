@@ -29,6 +29,8 @@ public class MainServer {
                 System.out.println("块" + (chunkNum + 1) + "读取" + i + "号桶索引用时：" + ((double) (System.currentTimeMillis() - startTime) / 1000) + "s");
 
                 BufferedReader inFromLson = new BufferedReader(new FileReader(FILE_PREFIX + (chunkNum + 1) + "_bucket_" + i + EXT));
+                // 标记初始位置 方便后面 skip 后的复原
+                inFromLson.mark(0);
                 bufferReaders.add(inFromLson);
             }
 
