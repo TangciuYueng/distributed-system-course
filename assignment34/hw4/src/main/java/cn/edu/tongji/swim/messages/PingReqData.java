@@ -1,12 +1,11 @@
-package cn.edu.tongji.swim.netEvents;
+package cn.edu.tongji.swim.messages;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Data
 @AllArgsConstructor
-public class PingReqEvent {
+public class PingReqData {
     private int seq;
     private String dest;
-    private String host;
 }

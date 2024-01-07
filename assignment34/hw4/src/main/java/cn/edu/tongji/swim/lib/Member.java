@@ -1,4 +1,4 @@
-package cn.edu.tongji.swim;
+package cn.edu.tongji.swim.lib;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
