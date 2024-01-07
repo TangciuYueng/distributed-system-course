@@ -43,7 +43,6 @@ public class DataSearchThread implements Runnable {
             outToClient.writeInt(dataBytes.length);
             outToClient.write(dataBytes);
 
-            outToClient.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
