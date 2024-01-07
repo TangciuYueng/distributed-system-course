@@ -2,9 +2,11 @@ package cn.edu.tongji.swim.lib;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @AllArgsConstructor
+@NoArgsConstructor
 public class Member {
     public enum State {
         ALIVE,
@@ -28,10 +30,6 @@ public class Member {
         this.host = member.host;
         this.state = member.state;
         this.incarnation = member.incarnation;
-    }
-
-    public Member getCopy() {
-        return new Member(meta, host, state, incarnation);
     }
 
     public boolean incarnate(Member data, boolean force, boolean preferCurrentMeta) {

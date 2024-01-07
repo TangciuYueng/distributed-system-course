@@ -5,6 +5,7 @@ import cn.edu.tongji.swim.membershipEvents.ChangeEvent;
 import cn.edu.tongji.swim.membershipEvents.DropEvent;
 import cn.edu.tongji.swim.membershipEvents.UpdateEvent;
 import cn.edu.tongji.swim.messages.Message;
+import cn.edu.tongji.swim.messages.MessageData;
 import cn.edu.tongji.swim.messages.SyncData;
 import cn.edu.tongji.swim.messages.UpdateData;
 import cn.edu.tongji.swim.netEvents.AckEvent;
@@ -19,6 +20,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
+import static cn.edu.tongji.Main.*;
+import static cn.edu.tongji.swim.lib.JsTime.*;
 
 @Data
 public class Membership {
@@ -27,7 +30,6 @@ public class Membership {
         boolean preferCurrentMeta = false;
     }
 
-    private Swim swim;
     private Member local;
     private EventBus eventBus;
     private int suspectTimeout;
@@ -35,27 +37,19 @@ public class Membership {
     private Map<String, Member> hostToMember;
     private Map<String, Member> hostToFaulty;
     private Map<String, Member> hostToIterable;
-    private Map<String, ScheduledFuture<?>> hostToSuspectTimeout;
-    private ScheduledExecutorService scheduler;
+    private Map<String, Timer> hostToSuspectTimeout;
+    private ExecutorService exec;
 
-    // 构造函数
-    public Membership(Swim swim, Member local) {
-        this(swim, local, MembershipDefault.suspectTimeout, MembershipDefault.preferCurrentMeta);
-    }
-
-    public Membership(Swim swim, Member local, int suspectTimeout, boolean preferCurrentMeta) {
-        this.swim = swim;
+    public Membership(Member local, Integer suspectTimeout, Boolean preferCurrentMeta) {
         this.local = local;
         this.eventBus = new EventBus();
-        this.suspectTimeout = suspectTimeout;
-        this.preferCurrentMeta = preferCurrentMeta;
+        this.suspectTimeout = suspectTimeout == null ? MembershipDefault.suspectTimeout : suspectTimeout;
+        this.preferCurrentMeta = preferCurrentMeta == null ? MembershipDefault.preferCurrentMeta : preferCurrentMeta;
         this.hostToMember = new ConcurrentHashMap<>();
         this.hostToFaulty = new ConcurrentHashMap<>();
         this.hostToIterable = new ConcurrentHashMap<>();
         this.hostToSuspectTimeout = new ConcurrentHashMap<>();
-        this.scheduler = Executors.newScheduledThreadPool(1);
-
-        start();
+        this.exec = Executors.newCachedThreadPool();
     }
 
     // 将当前对象注册为故障检测器的事件总线和网络事件总线的事件监听器
@@ -72,7 +66,7 @@ public class Membership {
     public void stop() {
         swim.getFailureDetector().getEventBus().unregister(this);
         swim.getNet().getEventBus().unregister(this);
-        scheduler.shutdown();
+
         // 取消设置的定时任务
 //
 //        public class ScheduledExecutorExample {
@@ -125,9 +119,10 @@ public class Membership {
         String host = event.getHost();
         Member member = hostToMember.getOrDefault(host, null);
         if (member != null && member.getState() == Member.State.SUSPECT) {
-            UpdateData data = new UpdateData(member.getCopy());
+            UpdateData updateData = new UpdateData(member);
+            MessageData data = MessageData.builder().updateData(updateData).build();
             Message message = new Message(MessageType.UPDATE, data);
-            swim.getNet().sendMessage(message, host);
+            swim.getNet().sendMessage("membership", message, host);
         }
     }
 
@@ -137,37 +132,38 @@ public class Membership {
         if (member == null) {
             return;
         }
+
         // 获得副本
-        Member copy = member.getCopy();
+        Member copy = new Member(member);
         // 将设置为 SUSPECT
         copy.setState(Member.State.SUSPECT);
-        Member copy2 = copy.getCopy();
 
         // 取消对应延时任务
-        hostToSuspectTimeout.get(copy2.getHost()).cancel(true);
+        Timer t = hostToSuspectTimeout.get(copy.getHost());
+        if (t != null) {
+            t.cancel();
+        }
 
         // 设置为 FAULTY 的任务
-        Runnable setFaultyTask = () -> {
-            hostToSuspectTimeout.remove(copy2.getHost());
-            copy2.setState(Member.State.FAULTY);
-            onUpdate(new UpdateEvent(copy2));
-        };
+        exec.execute(() -> {
+            Timer timer = new Timer();
+            setTimeout(timer, new TimerTask() {
+                @Override
+                public void run() {
+                    hostToSuspectTimeout.remove(copy.getHost());
+                    copy.setState(Member.State.FAULTY);
+                    onUpdate(new UpdateEvent(copy));
+                }
+            }, suspectTimeout);
 
-        // 更新状态的任务
-        Runnable updateTask = () -> {
-            hostToSuspectTimeout.remove(copy2.getHost());
-            onUpdate(new UpdateEvent(copy.getCopy()));
-        };
+            hostToSuspectTimeout.put(copy.getHost(), timer);
+        });
 
-        // 延迟执行设置为 FAULTY 的任务
-        scheduler.schedule(setFaultyTask, suspectTimeout, TimeUnit.MILLISECONDS);
-
-        // 立即执行更新状态的任务
-        scheduler.schedule(updateTask, 0, TimeUnit.MILLISECONDS);
+        onUpdate(new UpdateEvent(event.getMember()));
     }
 
     @Subscribe
-    private void onSync(SyncEvent event) {
+    public void onSync(SyncEvent event) {
         Member member = event.getMember();
         String host = member.getHost();
 
@@ -178,35 +174,45 @@ public class Membership {
         List<Message> messages = new ArrayList<>();
 
         for (Member data : allMembers) {
-            Message message = new Message(MessageType.UPDATE, new UpdateData(data));
+            UpdateData updateData = new UpdateData(data);
+            Message message = new Message(MessageType.UPDATE, MessageData.builder().updateData(updateData).build());
             messages.add(message);
         }
 
         // 发送多条 msg
-        swim.getNet().sendMessages(messages, host);
+        swim.getNet().sendMessages("membership", messages, host);
     }
 
     public void sync(List<String> hosts) {
-        SyncData syncData = new SyncData(local.getCopy());
-        Message syncMessage = new Message(MessageType.SYNC, syncData);
-        List<Message> messages = new ArrayList<>(List.of(syncMessage));
+        SyncData syncData = new SyncData(local);
+        MessageData messageData1 = MessageData.builder().syncData(syncData).build();
+        Message syncMessage = new Message(MessageType.SYNC, messageData1);
+        List<Message> messages = new ArrayList<>();
+        messages.add(syncMessage);
 
         all(false, true).forEach(member -> {
+            System.out.println("add Update");
+            log("add update");
             UpdateData updateData = new UpdateData(member);
-            Message updateMessage = new Message(MessageType.UPDATE, updateData);
+            MessageData messageData2 = MessageData.builder().updateData(updateData).build();
+            Message updateMessage = new Message(MessageType.UPDATE, messageData2);
             messages.add(updateMessage);
         });
 
+        System.out.println("SYNC total: " + messages.size());
+        log("SYNC total: " + messages.size());
+
         hosts.forEach(host ->
-            swim.getNet().sendMessages(messages, host)
+            swim.getNet().sendMessages("membership", messages, host)
         );
     }
 
     @Subscribe
-    private void onUpdate(UpdateEvent event) {
+    public void onUpdate(UpdateEvent event) {
         Member member = event.getMember();
 
         System.out.println("received update" + member);
+        log("received update" + member);
 
         switch (member.getState()) {
             case ALIVE -> updateAlive(member);
@@ -218,7 +224,7 @@ public class Membership {
     void updateAlive(Member data) {
         if (Objects.equals(data.getHost(), local.getHost())) {
             if (local.incarnate(data, false, preferCurrentMeta)) {
-                eventBus.post(new UpdateEvent(local.getCopy()));
+                eventBus.post(new UpdateEvent(local));
             } else {
                 eventBus.post(new DropEvent(data));
             }
@@ -233,17 +239,19 @@ public class Membership {
 
         var member1 = hostToMember.getOrDefault(data.getHost(), null);
         if (member1 == null || data.getIncarnation() > member1.getIncarnation()) {
-            hostToSuspectTimeout.get(data.getHost()).cancel(true);
+            Timer t = hostToSuspectTimeout.get(data.getHost());
+            if (t != null)
+                t.cancel();
             hostToSuspectTimeout.remove(data.getHost());
             hostToFaulty.remove(data.getHost());
 
             hostToMember.put(data.getHost(), new Member(data));
             if (member1 == null) {
                 hostToIterable.put(data.getHost(), hostToMember.get(data.getHost()));
-                eventBus.post(new ChangeEvent(hostToMember.get(data.getHost()).getCopy()));
+                eventBus.post(new ChangeEvent(hostToMember.get(data.getHost())));
             }
 
-            eventBus.post(new UpdateEvent(hostToMember.get(data.getHost()).getCopy()));
+            eventBus.post(new UpdateEvent(hostToMember.get(data.getHost())));
         } else {
             eventBus.post(new DropEvent(data));
         }
@@ -253,7 +261,7 @@ public class Membership {
         if (Objects.equals(data.getHost(), local.getHost())) {
             eventBus.post(new DropEvent(data));
             local.incarnate(data, true, preferCurrentMeta);
-            eventBus.post(new UpdateEvent(local.getCopy()));
+            eventBus.post(new UpdateEvent(local));
             return;
         }
 
@@ -274,10 +282,10 @@ public class Membership {
             hostToMember.put(data.getHost(), new Member(data));
             if (member1 == null) {
                 hostToIterable.put(data.getHost(), hostToMember.get(data.getHost()));
-                eventBus.post(new ChangeEvent(hostToMember.get(data.getHost()).getCopy()));
+                eventBus.post(new ChangeEvent(hostToMember.get(data.getHost())));
             }
 
-            eventBus.post(new UpdateEvent(hostToMember.get(data.getHost()).getCopy()));
+            eventBus.post(new UpdateEvent(hostToMember.get(data.getHost())));
         } else {
             eventBus.post(new DropEvent(data));
         }
@@ -360,14 +368,14 @@ public class Membership {
      * @return 所有成员数据的列表
      */
     public List<Member> all(boolean hasLocal, boolean hasFaulty) {
-         List<Member> results = new ArrayList<>(hostToMember.size() + (hasLocal ? 1 : 0) + (hasFaulty ? hostToFaulty.size() : 0));
+        List<Member> results = new ArrayList<>(hostToMember.size() + (hasLocal ? 1 : 0) + (hasFaulty ? hostToFaulty.size() : 0));
 
         // 添加存活成员到结果列表
         results.addAll(hostToMember.values());
 
         // 如果需要包含本地成员，则将本地成员添加到结果列表
         if (hasLocal) {
-            results.add(local.getCopy());
+            results.add(local);
         }
 
         // 如果需要包含故障成员，则将故障成员添加到结果列表

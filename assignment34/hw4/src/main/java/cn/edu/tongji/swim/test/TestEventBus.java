@@ -32,19 +32,19 @@ public class TestEventBus {
         eventBus.post(event);
     }
 
-    public static void main(String[] args) {
-        TestEventBus test = new TestEventBus();
-        test.start();
-        Scanner scanner = new Scanner(System.in);
-        String input;
-        while (true) {
-            input = scanner.nextLine();
-            test.sendMessage(input);
-            if (input.equalsIgnoreCase("q")) {
-                break;
-            }
-        }
-        test.stop();
-        scanner.close();
-    }
+//    public static void main(String[] args) {
+//        TestEventBus test = new TestEventBus();
+//        test.start();
+//        Scanner scanner = new Scanner(System.in);
+//        String input;
+//        while (true) {
+//            input = scanner.nextLine();
+//            test.sendMessage(input);
+//            if (input.equalsIgnoreCase("q")) {
+//                break;
+//            }
+//        }
+//        test.stop();
+//        scanner.close();
+//    }
 }

@@ -7,14 +7,14 @@ import org.greenrobot.eventbus.Subscribe;
 
 import java.io.IOException;
 import java.util.*;
+import static cn.edu.tongji.Main.*;
 
 public class Disseminator {
-    public interface DisseminatorDefault {
-        int disseminationFactor = 15;
-        int disseminationLimit = 3;
-        DisseminationFormula disseminationFormula = (factor, size) ->
-                (int) Math.ceil(factor * Math.log(size + 1) / Math.log(10));
-    }
+    private static final int DEFAULT_DISSEMINATION_FACTOR = 15;
+    private static final int DEFAULT_DISSEMINATION_LIMIT = 3;
+    private static final DisseminationFormula DEFAULT_DISSEMINATION_FORMULA = (factor, size) ->
+            (int) Math.ceil(factor * Math.log(size + 1) / Math.log(10));
+
     public interface DisseminationFormula {
         int calculate(int factor, int size);
     }
@@ -45,7 +45,6 @@ public class Disseminator {
         }
     }
 
-    private Swim swim;
     private EventBus eventBus;
     private int disseminationFactor;
     private int disseminationLimit;
@@ -53,13 +52,13 @@ public class Disseminator {
     private Map<Integer, Map<String, Update>> attemptsToUpdates;
     private Map<String, Integer> hostToAttempts;
 
-    public Disseminator(Swim swim, int disseminationFactor) {
-        this.swim = swim;
-        this.disseminationFactor = disseminationFactor;
-        this.disseminationLimit = DisseminatorDefault.disseminationLimit;
-        attemptsToUpdates = new HashMap<>();
-        hostToAttempts = new HashMap<>();
-        eventBus = new EventBus();
+    public Disseminator(Integer disseminationFactor) {
+        this.disseminationFactor = disseminationFactor == null ? DEFAULT_DISSEMINATION_FACTOR : disseminationFactor;
+        this.disseminationLimit = DEFAULT_DISSEMINATION_LIMIT;
+        this.disseminationFormula = DEFAULT_DISSEMINATION_FORMULA;
+        this.attemptsToUpdates = new HashMap<>();
+        this.hostToAttempts = new HashMap<>();
+        this.eventBus = new EventBus();
     }
 
     public void start() {
@@ -114,7 +113,6 @@ public class Disseminator {
         hostToAttempts.put(update.getHost(), update.getAttempts());
 
     }
-
 
     public void removeUpdate(Update update) {
         // 获取更新的尝试次数
@@ -182,7 +180,7 @@ public class Disseminator {
         header[0] = typeBuffer;
 
         // 假设 MemberData 类有相应的方法来获取 meta、host、state 和 incarnation
-        byte[] payload = this.swim.getCodec().encode(new Update(
+        byte[] payload = swim.getCodec().encode(new Update(
                 update.getMeta(),
                 update.getHost(),
                 update.getState(),
