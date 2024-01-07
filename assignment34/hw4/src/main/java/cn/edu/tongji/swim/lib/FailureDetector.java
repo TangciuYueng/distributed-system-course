@@ -13,17 +13,13 @@ import org.greenrobot.eventbus.Subscribe;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 
+import static cn.edu.tongji.Main.*;
 import static cn.edu.tongji.swim.lib.JsTime.setTimeout;
 
 @Data
 public class FailureDetector {
-
-    private final Swim swim;
     private final int interval;
     private EventBus eventBus;
     private final int pingTimeout;
@@ -34,17 +30,15 @@ public class FailureDetector {
     private final ConcurrentMap<Integer, Timer> seqToTimeout = new ConcurrentHashMap<>();
     private final ConcurrentMap<Integer, Runnable> seqToCallback = new ConcurrentHashMap<>();
 
-    private static final int DEFAULT_INTERVAL = 20;
+    private static final int DEFAULT_INTERVAL = 1000;
     private static final int DEFAULT_PING_TIMEOUT = 4;
     private static final int DEFAULT_PING_REQ_TIMEOUT = 12;
     private static final int DEFAULT_PING_REQ_GROUP_SIZE = 3;
 
     public static final String SUSPECT_EVENT = "suspect";
-    private final ExecutorService executorService = Executors.newCachedThreadPool();
 
     // 构造函数
-    public FailureDetector(Swim swim, FDOptions fdOptions) {
-        this.swim = swim;
+    public FailureDetector(FDOptions fdOptions) {
         this.eventBus = new EventBus();
         this.interval = fdOptions.getInterval() == null ? DEFAULT_INTERVAL : fdOptions.getInterval();
         this.pingTimeout = fdOptions.getPingTimeout() == null ? DEFAULT_PING_TIMEOUT : fdOptions.getPingTimeout();
@@ -53,7 +47,7 @@ public class FailureDetector {
     }
 
     public void start() {
-        this.swim.getNet().getEventBus().register(this);
+        swim.getNet().getEventBus().register(this);
         tick();
     }
 
@@ -78,13 +72,13 @@ public class FailureDetector {
         TimerTask timerTask = new TimerTask() {
             @Override
             public void run() {
+                System.out.println("ping...");
                 ping();
             }
         };
 
         // 创建定时器并设定周期
-        tickTimer = new Timer(true);
-        tickTimer.scheduleAtFixedRate(timerTask, 0, interval);
+        executorService.scheduleAtFixedRate(this::ping, 0, interval, TimeUnit.MILLISECONDS);
     }
 
     private void ping() {
@@ -107,9 +101,10 @@ public class FailureDetector {
         seqToTimeout.put(oldSeq, timer);
 
         // 使用网络模块发送 Ping 消息
-        PingData data = new PingData(seq);
+        PingData pingData = new PingData(seq);
+        MessageData data = MessageData.builder().pingData(pingData).build();
         Message message = new Message(MessageType.PING, data);
-        swim.getNet().sendMessage(message, member.getHost());
+        swim.getNet().sendMessage("failure-detector", message, member.getHost());
     }
 
     private void pingReq(Member member) {
@@ -155,21 +150,23 @@ public class FailureDetector {
         });
 
         // 使用网络模块发送 PingReq 消息
-        PingReqData data = new PingReqData(oldSeq, memberHost);
+        PingReqData pingReqData = new PingReqData(oldSeq, memberHost);
+        MessageData data = MessageData.builder().pingReqData(pingReqData).build();
         Message message = new Message(MessageType.PING_REQ, data);
-        swim.getNet().sendMessage(message, relayMemberHost);
+        swim.getNet().sendMessage("failure-detector", message, relayMemberHost);
     }
 
     @Subscribe
-    private void onPing(PingEvent event) {
+    public void onPing(PingEvent event) {
         // 使用网络模块发送 Ack 消息
-        AckData data = new AckData(event.getSeq(), event.getHost());
+        AckData ackData = new AckData(event.getSeq(), event.getHost());
+        MessageData data = MessageData.builder().ackData(ackData).build();
         Message message = new Message(MessageType.ACK, data);
-        swim.getNet().sendMessage(message, event.getHost());
+        swim.getNet().sendMessage("failure-detector", message, event.getHost());
     }
 
     @Subscribe
-    private void onPingReq(PingReqEvent event) {
+    public void onPingReq(PingReqEvent event) {
         // 获取当前序列号
         final int oldSeq = seq;
 
@@ -186,19 +183,21 @@ public class FailureDetector {
         // 使用回调函数，在收到 pingReqAck 时执行回调操作
         seqToCallback.put(oldSeq, () -> {
             clearSeq(oldSeq);
-            AckData data = new AckData(event.getSeq(), null);
+            AckData ackData = new AckData(event.getSeq(), null);
+            MessageData data = MessageData.builder().ackData(ackData).build();
             Message message = new Message(MessageType.ACK, data);
-            swim.getNet().sendMessage(message, event.getHost());
+            swim.getNet().sendMessage("failure-detector", message, event.getHost());
         });
 
         // 使用网络模块发送 Ping 消息
-        PingData data = new PingData(event.getSeq());
+        PingData pingData = new PingData(event.getSeq());
+        MessageData data = MessageData.builder().pingData(pingData).build();
         Message message = new Message(MessageType.PING, data);
-        swim.getNet().sendMessage(message, event.getDest());
+        swim.getNet().sendMessage("failure-detector", message, event.getDest());
     }
 
     @Subscribe
-    private void onAck(AckEvent event) {
+    public void onAck(AckEvent event) {
         //这个函数会和Membership.onAck同时触发
         if (event.getSeq() == null)
             return;

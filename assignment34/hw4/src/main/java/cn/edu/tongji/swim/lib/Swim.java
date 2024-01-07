@@ -9,13 +9,10 @@ import lombok.Data;
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 
 import static cn.edu.tongji.swim.lib.JsTime.*;
-import static cn.edu.tongji.swim.bench.Dumb.*;
+import static cn.edu.tongji.Main.*;
 
 @Data
 public class Swim {
@@ -44,10 +41,9 @@ public class Swim {
                 opts.getCodec()
         );
         this.disseminator = new Disseminator(
-                this,
                 opts.getDisseminationFactor()
         );
-        this.failureDetector = new FailureDetector(this, new FDOptions(
+        this.failureDetector = new FailureDetector(new FDOptions(
                 opts.getInterval(),
                 opts.getPingTimeout(),
                 opts.getPingReqTimeout(),
@@ -55,20 +51,19 @@ public class Swim {
             )
         );
         this.membership = new Membership(
-                this,
                 new Member(opts.getLocal()),
                 opts.getSuspectTimeout(),
-                opts.isPreferCurrentMeta()
+                opts.getPreferCurrentMeta()
         );
-        this.net = new Net(this, new UdpOptions(
+        this.net = new Net(new UdpOptions(
                 Integer.parseInt(opts.getLocal().split(":")[1]),
                 opts.getUdp().getMaxDgramSize()
             )
         );
         this.state = SwimState.STOPPED;
 
-        this.joinTimeout = opts.getJoinTimeout() != 0 ? opts.getJoinTimeout() : DEFAULT_JOIN_TIMEOUT;
-        this.joinCheckInterval = opts.getJoinCheckInterval() != 0 ? opts.getJoinCheckInterval()
+        this.joinTimeout = opts.getJoinTimeout() != null ? opts.getJoinTimeout() : DEFAULT_JOIN_TIMEOUT;
+        this.joinCheckInterval = opts.getJoinCheckInterval() != null ? opts.getJoinCheckInterval()
                 : DEFAULT_JOIN_CHECK_INTERVAL;
     }
 
@@ -95,11 +90,13 @@ public class Swim {
             return;
         }
         else {
+            System.out.println("原神，()()！");
             failureDetector.start();
             membership.start();
             disseminator.start();
             membership.getEventBus().register(this);
             state = SwimState.STARTED;
+            join(hosts);
         }
     }
 
@@ -120,8 +117,8 @@ public class Swim {
     }
 
     public void join(List<String> hosts) {
-        if (state == SwimState.STARTED) {
-            CustomExceptions.InvalidStateException err = new CustomExceptions.InvalidStateException("Invalid state: " + state + ", expected: STOPPED");
+        if (state != SwimState.STARTED) {
+            CustomExceptions.InvalidStateException err = new CustomExceptions.InvalidStateException("Invalid state: " + state + ", expected: STARTED");
             onBootstrap(localhost(), err);
         }
 

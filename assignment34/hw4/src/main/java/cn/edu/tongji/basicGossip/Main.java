@@ -14,37 +14,37 @@ import java.util.logging.Logger;
 public class Main {
 
     private static final Logger LOGGER = Logger.getLogger(Main.class.getName());
-    public static void main(String[] args) throws SocketException {
-        GossipConfig config = new GossipConfig(
-                Duration.ofSeconds(3),
-                Duration.ofSeconds(3),
-                Duration.ofMillis(500),
-                Duration.ofMillis(500),
-                3
-        );
-
-        ExecutorService executorService = Executors.newCachedThreadPool();
-
-        GossipService initialNode = new GossipService(
-                new InetSocketAddress("127.0.0.1", 9090),
-                config
-        );
-
-        setGossipServiceHandlers(initialNode);
-
-        executorService.submit(initialNode::start);
-
-        for (int i = 1; i <= 10; i++) {
-            GossipService gossipService = new GossipService(
-                    new InetSocketAddress("127.0.0.1", 9090 + i),
-                    config
-            );
-
-            setGossipServiceHandlers(gossipService);
-
-            executorService.submit(gossipService::start);
-        }
-    }
+//    public static void main(String[] args) throws SocketException {
+//        GossipConfig config = new GossipConfig(
+//                Duration.ofSeconds(3),
+//                Duration.ofSeconds(3),
+//                Duration.ofMillis(500),
+//                Duration.ofMillis(500),
+//                3
+//        );
+//
+//        ExecutorService executorService = Executors.newCachedThreadPool();
+//
+//        GossipService initialNode = new GossipService(
+//                new InetSocketAddress("127.0.0.1", 9090),
+//                config
+//        );
+//
+//        setGossipServiceHandlers(initialNode);
+//
+//        executorService.submit(initialNode::start);
+//
+//        for (int i = 1; i <= 10; i++) {
+//            GossipService gossipService = new GossipService(
+//                    new InetSocketAddress("127.0.0.1", 9090 + i),
+//                    config
+//            );
+//
+//            setGossipServiceHandlers(gossipService);
+//
+//            executorService.submit(gossipService::start);
+//        }
+//    }
 
     private static void setGossipServiceHandlers(GossipService gossipService) {
         gossipService.setOnNewMember((inetSocketAddress) ->

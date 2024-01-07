@@ -41,7 +41,7 @@ public class Codec {
      * @param obj 需要编码的 Java 对象
      * @return 编码后的字节数组
      */
-    public byte[] encode(Object obj) throws IOException {
+    public <T> byte[] encode(Object obj) throws IOException {
         if ("json".equals(codec)) {
             ObjectMapper objectMapper = new ObjectMapper();
             return objectMapper.writeValueAsBytes(obj);

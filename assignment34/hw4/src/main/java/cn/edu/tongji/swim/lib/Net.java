@@ -11,16 +11,14 @@ import cn.edu.tongji.swim.options.UdpOptions;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.greenrobot.eventbus.EventBus;
-import org.greenrobot.eventbus.Subscribe;
 
 import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import static cn.edu.tongji.Main.*;
 
 @Data
 public class Net {
@@ -31,25 +29,23 @@ public class Net {
         int maxDgramSize;
     }
 
-    private Swim swim;
     private Udp udp;
     private DatagramSocket udpSocket;
+    private InetAddress localhost;
     private EventBus eventBus;
+    private ExecutorService exec = Executors.newFixedThreadPool(1);
 
     public static final int MESSAGE_TYPE_SIZE = 1;
     public static final int LENGTH_SIZE = 2;
 
-    public Net(Swim swim, UdpOptions udpOptions) {
-        this.swim = swim;
+    public Net(UdpOptions udpOptions) {
+        this.udp = new Udp(0, 0);
         this.udp.port = udpOptions.getPort();
         this.udp.maxDgramSize = udpOptions.getMaxDgramSize() == null ? 512 : udpOptions.getMaxDgramSize();
         this.eventBus = new EventBus();
-        this.eventBus.register(this);
     }
 
     public boolean listen() {
-        InetAddress localhost = null;
-
         try {
             localhost = InetAddress.getLocalHost();
         } catch (UnknownHostException e) {
@@ -58,32 +54,33 @@ public class Net {
             return false;
         }
 
-        try (ExecutorService exec = Executors.newFixedThreadPool(1)) {
+        try {
             final InetAddress finalLocalhost = localhost;
             byte[] receiveData = new byte[udp.maxDgramSize];
             udpSocket = new DatagramSocket(udp.port);
 
             //开始监听事件
             ListeningEvent listeningEvent = new ListeningEvent(localhost, udp.port, udp.maxDgramSize);
-            eventBus.post(listeningEvent);
+            onListening(listeningEvent);
 
             exec.execute(() -> {
                 try {
                     while (true) {
+                        System.out.println("waiting...");
                         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
                         udpSocket.receive(receivePacket);
 
                         //接收消息会进行对应的事件触发
                         NetEvent.Rinfo rinfo = new NetEvent.Rinfo(receivePacket.getAddress().toString(), receivePacket.getPort());
                         MessageEvent messageEvent = new MessageEvent(receivePacket.getData(), rinfo);
-                        eventBus.post(messageEvent);
+                        onNetMessage(messageEvent);
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
 
                     //错误事件
                     ErrorEvent errorEvent = new ErrorEvent(finalLocalhost, udp.port, e.getMessage());
-                    eventBus.post(errorEvent);
+                    onError(errorEvent);
                 }
             });
 
@@ -102,9 +99,9 @@ public class Net {
     public void stop() {
         eventBus.unregister(this);
         udpSocket.close();
+        exec.close();
     }
 
-    @Subscribe
     public void onError(ErrorEvent event) {
         System.out.println(
                 "udp socket error occur\n" +
@@ -114,7 +111,6 @@ public class Net {
         );
     }
 
-    @Subscribe
     public void onListening(ListeningEvent event) {
         System.out.println(
                 "start listening\n" +
@@ -124,12 +120,11 @@ public class Net {
         );
     }
 
-    @Subscribe
     public void onNetMessage(MessageEvent event) {
         System.out.println(
-                "received buffer\n" +
+                localhost.getHostAddress() + ':' + udp.port + " received net message\n" +
                 "from: " + event.getRinfo().format() + '\n' +
-                "length: " + event.getBuffer().length + '\n'
+                "length: " + event.getBuffer().length
         );
 
         onMessage(event.getBuffer(), event.getRinfo());
@@ -161,8 +156,10 @@ public class Net {
             return;
         }
 
-        int numberOfMessages = buffer[0];
-        byte[] message = Arrays.copyOfRange(buffer, 1, buffer.length);
+        ByteBuffer bf = ByteBuffer.wrap(Arrays.copyOfRange(buffer, 0, LENGTH_SIZE));
+        int numberOfMessages = bf.getShort();
+        System.out.println("number of messages: " + numberOfMessages);
+        byte[] message = Arrays.copyOfRange(buffer, LENGTH_SIZE, buffer.length);
         int readIndex = LENGTH_SIZE;
 
         for (int i = 0; i < numberOfMessages; i++) {
@@ -180,9 +177,12 @@ public class Net {
 
             byte[] messageLengthBinary = Arrays.copyOfRange(message, 0, LENGTH_SIZE);
             message = Arrays.copyOfRange(message, LENGTH_SIZE, message.length);
-            int messageLength = ByteBuffer.wrap(messageLengthBinary).getInt();
-            onMessage(Arrays.copyOfRange(message, readIndex, readIndex + messageLength), rinfo);
+            readIndex += LENGTH_SIZE;
+            int messageLength = ByteBuffer.wrap(messageLengthBinary).getShort();
+
+            onMessage(Arrays.copyOfRange(message, 0, messageLength), rinfo);
             readIndex += messageLength;
+            message = Arrays.copyOfRange(message, messageLength, message.length);
         }
     }
 
@@ -301,50 +301,71 @@ public class Net {
     }
 
     //外部调用
-    public void sendMessages(List<Message> messages, String host) {
+    public void sendMessages(String sender, List<Message> messages, String host) {
         int bytesAvailable = udp.maxDgramSize - MESSAGE_TYPE_SIZE - LENGTH_SIZE;
         List<byte[]> buffers = new ArrayList<>();
 
         for (int i = 0; i < messages.size(); i++) {
             Message message = messages.get(i);
             byte typeBuffer = (byte) message.getType().ordinal();
+            byte[] dataBuffer = null;
 
             try {
-                byte[] dataBuffer = swim.getCodec().encode(message.getData());
-                ByteBuffer bf = ByteBuffer.allocate(dataBuffer.length + 1);
-                bf.put(typeBuffer);
-                bf.put(dataBuffer);
-                byte[] totalBuffer = bf.array();
-
-                if (totalBuffer.length + LENGTH_SIZE < bytesAvailable) {
-                    buffers.add(totalBuffer);
-                    bytesAvailable -= (totalBuffer.length + LENGTH_SIZE);
-                }
-                else if (buffers.size() == 0) {
-                    System.out.println(
-                            "oversized message\n" +
-                            "length: " + totalBuffer.length + '\n' +
-                            "message: " + message
-                    );
-                }
-                else {
-                    sendBuffer(makeCompoundMessages(buffers), host);
-                    bytesAvailable = udp.maxDgramSize - LENGTH_SIZE;
-                    buffers.clear();
-                    i--;
+                switch (message.getType()) {
+                    case ACK -> dataBuffer = swim.getCodec().encode(message.getData().getAckData());
+                    case PING -> dataBuffer = swim.getCodec().encode(message.getData().getPingData());
+                    case PING_REQ -> dataBuffer = swim.getCodec().encode(message.getData().getPingReqData());
+                    case SYNC -> dataBuffer = swim.getCodec().encode(message.getData().getSyncData());
+                    case UPDATE -> dataBuffer = swim.getCodec().encode(message.getData().getUpdateData());
+                    default -> {
+                        System.out.println("unknown message type, stop encoding");
+                        return;
+                    }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
                 System.out.println(
-                        "failed to decode data\n" +
+                        "failed to encode data\n" +
                         "to: " + host + '\n' +
                         "data: " + message.getData() + '\n'
                 );
                 return;
             }
+
+            System.out.println(
+                    sender + " sending multiple...\n" +
+                    "from: " + localhost.getHostAddress() + ':' + udp.port + '\n' +
+                    "to: " + host + '\n' +
+                    "type: " + message.getType().toString() + '\n' +
+                    "data: " + message.getData()
+            );
+            ByteBuffer bf = ByteBuffer.allocate(dataBuffer.length + 1);
+            bf.put(typeBuffer);
+            bf.put(dataBuffer);
+            byte[] totalBuffer = bf.array();
+
+            if (totalBuffer.length + LENGTH_SIZE < bytesAvailable) {
+                System.out.println("add buffers");
+                buffers.add(totalBuffer);
+                bytesAvailable -= (totalBuffer.length + LENGTH_SIZE);
+            }
+            else if (buffers.size() == 0) {
+                System.out.println(
+                        "oversized message\n" +
+                        "length: " + totalBuffer.length + '\n' +
+                        "message: " + message
+                );
+            }
+            else {
+                sendBuffer(makeCompoundMessages(buffers), host);
+                bytesAvailable = udp.maxDgramSize - LENGTH_SIZE;
+                buffers.clear();
+                i--;
+            }
         }
 
         if (buffers.size() > 0) {
+            System.out.println("end, make compound");
             sendBuffer(makeCompoundMessages(buffers), host);
         }
     }
@@ -373,24 +394,51 @@ public class Net {
     }
 
     //外部调用
-    public void sendMessage(Message message, String host) {
+    public void sendMessage(String sender, Message message, String host) {
         if (message.getData() != null) {
+            byte[] data = null;
+
             try {
-                byte[] data = swim.getCodec().encode(message.getData());
-                ByteBuffer bf = ByteBuffer.allocate(MESSAGE_TYPE_SIZE + data.length);
-                bf.put((byte) message.getType().ordinal());
-                bf.put(data);
-                piggybackAndSend(bf.array(), host);
+                switch (message.getType()) {
+                    case ACK -> data = swim.getCodec().encode(message.getData().getAckData());
+                    case PING -> data = swim.getCodec().encode(message.getData().getPingData());
+                    case PING_REQ -> data = swim.getCodec().encode(message.getData().getPingReqData());
+                    case SYNC -> data = swim.getCodec().encode(message.getData().getSyncData());
+                    case UPDATE -> data = swim.getCodec().encode(message.getData().getUpdateData());
+                    default -> {
+                        System.out.println("unknown message type, stop encoding");
+                        return;
+                    }
+                }
             } catch (IOException e) {
                 e.printStackTrace();
                 System.out.println(
-                        "failed to decode data\n" +
+                        "failed to encode data\n" +
                         "to: " + host + '\n' +
                         "data: " + message.getData() + '\n'
                 );
             }
+
+            System.out.println(
+                    sender + " sending single...\n" +
+                    "from: " + localhost.getHostAddress() + ':' + udp.port + '\n' +
+                    "to: " + host + '\n' +
+                    "type: " + message.getType().toString() + '\n' +
+                    "data: " + message.getData()
+            );
+            ByteBuffer bf = ByteBuffer.allocate(MESSAGE_TYPE_SIZE + data.length);
+            bf.put((byte) message.getType().ordinal());
+            bf.put(data);
+            piggybackAndSend(bf.array(), host);
         }
         else {
+            System.out.println(
+                    sender + " sending single empty...\n" +
+                    "from: " + localhost.getHostAddress() + ':' + udp.port + '\n' +
+                    "to: " + host + '\n' +
+                    "type: " + message.getType().toString() +
+                    "data: " + message.getData()
+            );
             ByteBuffer bf = ByteBuffer.allocate(MESSAGE_TYPE_SIZE);
             bf.put((byte) message.getType().ordinal());
             piggybackAndSend(bf.array(), host);

@@ -64,4 +64,28 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>2.4</version>
+                <configuration>
+                    <archive>
+                        <!-- 配置项 -->
+                        <manifest>
+                            <!-- 配置项 -->
+                            <addClasspath>true</addClasspath>
+                            <mainClass>cn.edu.tongji.Main</mainClass>
+                        </manifest>
+                    </archive>
+                    <includes>
+                        <include>C:\Users\CHEMISTRYMASTER\.m2\repository\org\greenrobot\eventbus\3.1.1\eventbus-3.1.1.pom</include>
+                    </includes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
 </project>

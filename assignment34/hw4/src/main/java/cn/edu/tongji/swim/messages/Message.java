@@ -8,5 +8,5 @@ import lombok.Data;
 @AllArgsConstructor
 public class Message {
     private MessageType type;
-    private Object data;
+    private MessageData data;
 }

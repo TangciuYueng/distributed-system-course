@@ -9,18 +9,16 @@ import lombok.NoArgsConstructor;
 @Data
 @Builder
 public class SwimOptions {
-    private Swim swim;
     private String codec;
-    private int disseminationFactor;
-    private int disseminationLimit;
-    private int interval;
-    private int pingTimeout;
-    private int pingReqTimeout;
-    private int pingReqGroupSize;
+    private Integer disseminationFactor;
+    private Integer interval;
+    private Integer pingTimeout;
+    private Integer pingReqTimeout;
+    private Integer pingReqGroupSize;
     private String local;
-    private int suspectTimeout;
-    private boolean preferCurrentMeta;
+    private Integer suspectTimeout;
+    private Boolean preferCurrentMeta;
     private UdpOptions udp;
-    private int joinTimeout;
-    private int joinCheckInterval;
+    private Integer joinTimeout;
+    private Integer joinCheckInterval;
 }
