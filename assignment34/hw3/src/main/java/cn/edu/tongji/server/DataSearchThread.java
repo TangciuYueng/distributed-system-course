@@ -6,16 +6,18 @@ import lombok.AllArgsConstructor;
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.RandomAccess;
 
 @AllArgsConstructor
 public class DataSearchThread implements Runnable {
     private final Socket connectionSocket;
     private final String author;
     private final PersistentBTree<String, Long>[] trees;
-    private final List<BufferedReader> bufferedReaders;
+    private final List<RandomAccessFile> bufferedReaders;
     private final int bucketPerChunk;
 
     @Override
@@ -32,11 +34,11 @@ public class DataSearchThread implements Runnable {
                 return;
             }
 
-            BufferedReader reader = bufferedReaders.get(bucketNum);
-            reader.skip(pointer);
+            RandomAccessFile reader = bufferedReaders.get(bucketNum);
+
+            reader.seek(pointer);
             String data = reader.readLine();
-            // 指针回到 mark 标记的位置
-            reader.reset();
+
             // 找到信息
             outToClient.writeBoolean(true);
             // 发送字符串长度与字节数组
@@ -44,6 +46,7 @@ public class DataSearchThread implements Runnable {
             outToClient.writeInt(dataBytes.length);
             outToClient.write(dataBytes);
 
+            outToClient.close();
         } catch (IOException e) {
             e.printStackTrace();
         }

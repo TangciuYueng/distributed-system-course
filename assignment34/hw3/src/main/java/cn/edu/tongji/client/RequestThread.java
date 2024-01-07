@@ -43,7 +43,7 @@ public class RequestThread implements Callable<SearchResult> {
             // 接收数据
             inFromServer.readFully(dataBytes);
             String data = new String(dataBytes, StandardCharsets.UTF_8);
-            double time = (System.nanoTime() - startTime) / 1000000000;
+            double time = (double)(System.nanoTime() - startTime) / 1000000000;
             return new SearchResult(true, time, data);
         } catch (SocketTimeoutException e) {
             System.out.println("服务器" + (chunkNum + 1) + "超时...");
