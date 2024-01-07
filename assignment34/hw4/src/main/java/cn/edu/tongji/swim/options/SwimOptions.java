@@ -1,14 +1,13 @@
 package cn.edu.tongji.swim.options;
 
-import cn.edu.tongji.swim.Swim;
-import cn.edu.tongji.swim.options.UdpOptions;
+import cn.edu.tongji.swim.lib.Swim;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@AllArgsConstructor
-@NoArgsConstructor
+@Builder
 public class SwimOptions {
     private Swim swim;
     private String codec;

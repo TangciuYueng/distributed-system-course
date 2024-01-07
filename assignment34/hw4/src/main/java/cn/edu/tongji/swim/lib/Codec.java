@@ -1,4 +1,4 @@
-package cn.edu.tongji.swim;
+package cn.edu.tongji.swim.lib;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.msgpack.MessagePack;

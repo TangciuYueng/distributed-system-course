@@ -1,4 +1,4 @@
-package cn.edu.tongji.swim;
+package cn.edu.tongji.swim.lib;
 
 
 import cn.edu.tongji.swim.netEvents.AckEvent;
@@ -26,20 +26,9 @@ import java.util.concurrent.Executors;
 public class Net {
     @AllArgsConstructor
     @Data
-    public static class Udp {
+    private static class Udp {
         int port;
         int maxDgramSize;
-    }
-
-    public enum EventType {
-        Error,
-        Listening,
-        Ping,
-        PingReq,
-        Sync,
-        Ack,
-        Update,
-        Unknown
     }
 
     private Swim swim;
@@ -56,7 +45,6 @@ public class Net {
         this.udp.maxDgramSize = udpOptions.getMaxDgramSize() == null ? 512 : udpOptions.getMaxDgramSize();
         this.eventBus = new EventBus();
         this.eventBus.register(this);
-        //this.run();
     }
 
     public boolean listen() {
@@ -109,6 +97,11 @@ public class Net {
             );
             return false;
         }
+    }
+
+    public void stop() {
+        eventBus.unregister(this);
+        udpSocket.close();
     }
 
     @Subscribe

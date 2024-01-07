@@ -1,4 +1,4 @@
-package cn.edu.tongji.swim;
+package cn.edu.tongji.swim.lib;
 
 import cn.edu.tongji.swim.failureDetectorEvents.SuspectEvent;
 import cn.edu.tongji.swim.membershipEvents.ChangeEvent;
@@ -9,10 +9,13 @@ import cn.edu.tongji.swim.messages.SyncData;
 import cn.edu.tongji.swim.messages.UpdateData;
 import cn.edu.tongji.swim.netEvents.AckEvent;
 import cn.edu.tongji.swim.netEvents.SyncEvent;
+import com.google.common.hash.HashFunction;
+import com.google.common.hash.Hashing;
 import lombok.Data;
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
@@ -183,7 +186,7 @@ public class Membership {
         swim.getNet().sendMessages(messages, host);
     }
 
-    private void sync(List<String> hosts) {
+    public void sync(List<String> hosts) {
         SyncData syncData = new SyncData(local.getCopy());
         Message syncMessage = new Message(MessageType.SYNC, syncData);
         List<Message> messages = new ArrayList<>(List.of(syncMessage));
@@ -338,7 +341,11 @@ public class Membership {
         );
     }
 
-    private int size(boolean hasLocal) {
+    public Member get(String host) {
+        return hostToMember.get(host);
+    }
+
+    public int size(boolean hasLocal) {
         int count = hostToMember.size();
         if (hasLocal) {
             count++;
@@ -352,7 +359,7 @@ public class Membership {
      * @param hasFaulty 如果为 true，则包含故障成员
      * @return 所有成员数据的列表
      */
-    private List<Member> all(boolean hasLocal, boolean hasFaulty) {
+    public List<Member> all(boolean hasLocal, boolean hasFaulty) {
          List<Member> results = new ArrayList<>(hostToMember.size() + (hasLocal ? 1 : 0) + (hasFaulty ? hostToFaulty.size() : 0));
 
         // 添加存活成员到结果列表
@@ -388,11 +395,16 @@ public class Membership {
                 .collect(Collectors.toList());
 
         // 使用 farmhash 计算字符串列表的校验和
-        return farmhash.hash64(String.join("-", memberStrings));
+        HashFunction hashFunction = Hashing.farmHashFingerprint64();
+        return hashFunction.hashString(String.join("-", memberStrings), StandardCharsets.UTF_8).asLong();
     }
 
     boolean isLocal(String host) {
         return host.equals(local.getHost());
+    }
+
+    public String localhost() {
+        return local.getHost();
     }
 
     void updateMeta(Object meta) {

@@ -1,4 +1,4 @@
-package cn.edu.tongji.swim;
+package cn.edu.tongji.swim.lib;
 
 import cn.edu.tongji.swim.netEvents.AckEvent;
 import cn.edu.tongji.swim.netEvents.PingEvent;
@@ -17,6 +17,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import static cn.edu.tongji.swim.lib.JsTime.setTimeout;
 
 @Data
 public class FailureDetector {
@@ -211,17 +213,6 @@ public class FailureDetector {
 
         // 清除序列号相关的数据
         clearSeq(event.getSeq());
-    }
-
-    private void setTimeout(Timer timer, Runnable task, int timeout) {
-        TimerTask timerTask = new TimerTask() {
-            @Override
-            public void run() {
-                task.run();
-            }
-        };
-
-        timer.schedule(timerTask, timeout);
     }
 
     private void clearSeq(int seq) {

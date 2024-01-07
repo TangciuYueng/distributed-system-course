@@ -1,4 +1,4 @@
-package cn.edu.tongji.swim;
+package cn.edu.tongji.swim.lib;
 
 import cn.edu.tongji.swim.membershipEvents.ChangeEvent;
 import cn.edu.tongji.swim.membershipEvents.UpdateEvent;
@@ -53,14 +53,10 @@ public class Disseminator {
     private Map<Integer, Map<String, Update>> attemptsToUpdates;
     private Map<String, Integer> hostToAttempts;
 
-    public Disseminator(Swim swim) {
-        this(swim, DisseminatorDefault.disseminationFactor, DisseminatorDefault.disseminationLimit);
-    }
-
-    public Disseminator(Swim swim, int disseminationFactor, int disseminationLimit) {
+    public Disseminator(Swim swim, int disseminationFactor) {
         this.swim = swim;
         this.disseminationFactor = disseminationFactor;
-        this.disseminationLimit = disseminationLimit;
+        this.disseminationLimit = DisseminatorDefault.disseminationLimit;
         attemptsToUpdates = new HashMap<>();
         hostToAttempts = new HashMap<>();
         eventBus = new EventBus();

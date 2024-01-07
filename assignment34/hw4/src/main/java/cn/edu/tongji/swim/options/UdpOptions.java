@@ -6,6 +6,6 @@ import lombok.Data;
 @Data
 @AllArgsConstructor
 public class UdpOptions {
-    public Integer port;
-    public Integer maxDgramSize;
+    private Integer port;
+    private Integer maxDgramSize;
 }
