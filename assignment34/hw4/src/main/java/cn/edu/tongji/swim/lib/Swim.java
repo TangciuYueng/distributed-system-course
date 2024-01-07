@@ -90,7 +90,6 @@ public class Swim {
             return;
         }
         else {
-            System.out.println("原神，()()！");
             failureDetector.start();
             membership.start();
             disseminator.start();

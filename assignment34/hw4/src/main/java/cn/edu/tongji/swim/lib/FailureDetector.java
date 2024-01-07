@@ -68,17 +68,10 @@ public class FailureDetector {
 
     // 该方法的主要作用是在创建定时器并设定周期性任务，周期性地执行 ping 操作。
     private void tick() {
-        // 创建定时任务，周期性执行 ping 操作
-        TimerTask timerTask = new TimerTask() {
-            @Override
-            public void run() {
-                System.out.println("ping...");
-                ping();
-            }
-        };
-
         // 创建定时器并设定周期
-        executorService.scheduleAtFixedRate(this::ping, 0, interval, TimeUnit.MILLISECONDS);
+        executorService.scheduleAtFixedRate(() -> {
+            ping();
+        }, 0, interval, TimeUnit.MILLISECONDS);
     }
 
     private void ping() {

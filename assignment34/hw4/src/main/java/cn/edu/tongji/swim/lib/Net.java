@@ -51,6 +51,7 @@ public class Net {
         } catch (UnknownHostException e) {
             e.printStackTrace();
             System.out.println("this machine is not online, net initialize failed");
+            log("this machine is not online, net initialize failed");
             return false;
         }
 
@@ -67,6 +68,7 @@ public class Net {
                 try {
                     while (true) {
                         System.out.println("waiting...");
+                        log("waiting...");
                         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
                         udpSocket.receive(receivePacket);
 
@@ -87,11 +89,12 @@ public class Net {
             return true;
         } catch (SocketException e) {
             e.printStackTrace();
-            System.out.println(
-                    "udp socket initialize failed\n" +
+            String log = "udp socket initialize failed\n" +
                     "on: " + localhost + '\n' +
-                    "port: " + udp.port
-            );
+                    "port: " + udp.port + '\n';
+
+            System.out.println(log);
+            log(log);
             return false;
         }
     }
@@ -103,29 +106,29 @@ public class Net {
     }
 
     public void onError(ErrorEvent event) {
-        System.out.println(
-                "udp socket error occur\n" +
+        String log = "udp socket error occur\n" +
                 "on: " + event.getAddress() + '\n' +
                 "port: " + event.getPort() + '\n' +
-                "message: " + event.getMessage()
-        );
+                "message: " + event.getMessage();
+        System.out.println(log);
+        log(log);
     }
 
     public void onListening(ListeningEvent event) {
-        System.out.println(
-                "start listening\n" +
+        String log = "start listening\n" +
                 "on: " + event.getAddress() + '\n' +
                 "port: " + event.getPort() + '\n' +
-                "maxDgramSize: " + event.getMaxDgramSize()
-        );
+                "maxDgramSize: " + event.getMaxDgramSize();
+        System.out.println(log);
+        log(log);
     }
 
     public void onNetMessage(MessageEvent event) {
-        System.out.println(
-                localhost.getHostAddress() + ':' + udp.port + " received net message\n" +
+        String log = localhost.getHostAddress() + ':' + udp.port + " received net message\n" +
                 "from: " + event.getRinfo().format() + '\n' +
-                "length: " + event.getBuffer().length
-        );
+                "length: " + event.getBuffer().length;
+        System.out.println();
+        log(log);
 
         onMessage(event.getBuffer(), event.getRinfo());
     }
@@ -150,27 +153,31 @@ public class Net {
 
     public void onCompound(byte[] buffer, NetEvent.Rinfo rinfo) {
         System.out.println("received compound message");
+        log("received compound message");
 
         if (buffer.length < LENGTH_SIZE) {
             System.out.println("cannot parse number of messages in compound message");
+            log("cannot parse number of messages in compound message");
             return;
         }
 
         ByteBuffer bf = ByteBuffer.wrap(Arrays.copyOfRange(buffer, 0, LENGTH_SIZE));
         int numberOfMessages = bf.getShort();
         System.out.println("number of messages: " + numberOfMessages);
+        log("number of messages: " + numberOfMessages);
         byte[] message = Arrays.copyOfRange(buffer, LENGTH_SIZE, buffer.length);
         int readIndex = LENGTH_SIZE;
 
         for (int i = 0; i < numberOfMessages; i++) {
             if (message.length - readIndex < LENGTH_SIZE) {
-                System.out.println(
-                        "cannot parse number of messages in compound message\n" +
+                String log = "cannot parse number of messages in compound message\n" +
                         "readIndex: " + readIndex + '\n' +
                         "from: " + rinfo.format() + '\n' +
                         "length: " + message.length + '\n' +
-                        "buffer: " + Arrays.toString(message)
-                );
+                        "buffer: " + Arrays.toString(message);
+
+                System.out.println(log);
+                log(log);
 
                 break;
             }
@@ -189,114 +196,120 @@ public class Net {
     public void onPing(byte[] buffer, NetEvent.Rinfo rinfo) {
         try {
             PingData data = swim.getCodec().decode(buffer, PingData.class);
-            System.out.println(
-                    "received ping message\n" +
+            String log = "received ping message\n" +
                     "from: " + rinfo.format() + '\n' +
-                    "data: " + data
-            );
+                    "data: " + data;
+
+            System.out.println(log);
+            log(log);
 
             eventBus.post(new PingEvent(data.getSeq(), rinfo.getAddress()));
         } catch (IOException e) {
             e.printStackTrace();
-            System.out.println(
-                    "failed to decode data\n" +
+            String log = "failed to decode data\n" +
                     "from: " + rinfo.format() + '\n' +
                     "length: " + buffer.length + '\n' +
-                    "buffer: " + Arrays.toString(buffer)
-            );
+                    "buffer: " + Arrays.toString(buffer);
+            System.out.println(log);
+            log(log);
         }
     }
 
     public void onPingReq(byte[] buffer, NetEvent.Rinfo rinfo) {
         try {
             PingReqData data = swim.getCodec().decode(buffer, PingReqData.class);
-            System.out.println(
-                    "received pingreq message\n" +
+            String log = "received pingreq message\n" +
                     "from: " + rinfo.format() + '\n' +
-                    "data: " + data
-            );
+                    "data: " + data;
+            System.out.println(log);
+            log(log);
 
             eventBus.post(new PingReqEvent(data.getSeq(), data.getDest(), rinfo.getAddress()));
         } catch (IOException e) {
             e.printStackTrace();
-            System.out.println(
-                    "failed to decode data\n" +
+            String log = "failed to decode data\n" +
                     "from: " + rinfo.format() + '\n' +
                     "length: " + buffer.length + '\n' +
-                    "buffer: " + Arrays.toString(buffer)
-            );
+                    "buffer: " + Arrays.toString(buffer);
+
+            System.out.println(log);
+            log(log);
         }
     }
 
     public void onSync(byte[] buffer, NetEvent.Rinfo rinfo) {
         try {
             SyncData data = swim.getCodec().decode(buffer, SyncData.class);
-            System.out.println(
-                    "received sync message\n" +
+            String log = "received sync message\n" +
                     "from: " + rinfo.format() + '\n' +
-                    "data: " + data
-            );
+                    "data: " + data;
+            System.out.println(log);
+            log(log);
 
             eventBus.post(new SyncEvent(data.getMember()));
         } catch (IOException e) {
             e.printStackTrace();
-            System.out.println(
-                    "failed to decode data\n" +
+            String log = "failed to decode data\n" +
                     "from: " + rinfo.format() + '\n' +
                     "length: " + buffer.length + '\n' +
-                    "buffer: " + Arrays.toString(buffer)
-            );
+                    "buffer: " + Arrays.toString(buffer);
+
+            System.out.println(log);
+            log(log);
         }
     }
 
     public void onAck(byte[] buffer, NetEvent.Rinfo rinfo) {
         try {
             AckData data = swim.getCodec().decode(buffer, AckData.class);
-            System.out.println(
-                    "received ack message\n" +
+            String log = "received ack message\n" +
                     "from: " + rinfo.format() + '\n' +
-                    "data: " + data
-            );
+                    "data: " + data;
+            System.out.println(log);
+            log(log);
 
             eventBus.post(new AckEvent(data.getSeq(), data.getHost()));
         } catch (IOException e) {
             e.printStackTrace();
-            System.out.println(
-                    "failed to decode data\n" +
+            String log = "failed to decode data\n" +
                     "from: " + rinfo.format() + '\n' +
                     "length: " + buffer.length + '\n' +
-                    "buffer: " + Arrays.toString(buffer)
-            );
+                    "buffer: " + Arrays.toString(buffer);
+
+            System.out.println(log);
+            log(log);
         }
     }
 
     public void onUpdate(byte[] buffer, NetEvent.Rinfo rinfo) {
         try {
             UpdateData data = swim.getCodec().decode(buffer, UpdateData.class);
-            System.out.println(
-                    "received update message\n" +
+            String log = "received update message\n" +
                     "from: " + rinfo.format() + '\n' +
-                    "data: " + data
-            );
+                    "data: " + data;
+            System.out.println(log);
+            log(log);
 
             eventBus.post(new UpdateEvent(data.getMember()));
         } catch (IOException e) {
             e.printStackTrace();
-            System.out.println(
-                    "failed to decode data\n" +
+            String log = "failed to decode data\n" +
                     "from: " + rinfo.format() + '\n' +
                     "length: " + buffer.length + '\n' +
-                    "buffer: " + Arrays.toString(buffer)
-            );
+                    "buffer: " + Arrays.toString(buffer);
+
+            System.out.println(log);
+            log(log);
         }
     }
 
     public void onUnknown(byte[] buffer, NetEvent.Rinfo rinfo) {
-        System.out.println(
-                "received unknown buffer\n" +
+        String log = "received unknown buffer\n" +
                 "from: " + rinfo.format() + '\n' +
-                "buffer: " + Arrays.toString(buffer)
-        );
+                "buffer: " + Arrays.toString(buffer);
+
+        System.out.println(log);
+        log(log);
         eventBus.post(new UnknownEvent(buffer, rinfo));
     }
 
@@ -319,42 +332,42 @@ public class Net {
                     case UPDATE -> dataBuffer = swim.getCodec().encode(message.getData().getUpdateData());
                     default -> {
                         System.out.println("unknown message type, stop encoding");
+                        log("unknown message type, stop encoding");
                         return;
                     }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
-                System.out.println(
-                        "failed to encode data\n" +
+                String log = "failed to encode data\n" +
                         "to: " + host + '\n' +
-                        "data: " + message.getData() + '\n'
-                );
+                        "data: " + message.getData() + '\n';
+                System.out.println(log);
+                log(log);
                 return;
             }
 
-            System.out.println(
-                    sender + " sending multiple...\n" +
+            String log = sender + " sending multiple...\n" +
                     "from: " + localhost.getHostAddress() + ':' + udp.port + '\n' +
                     "to: " + host + '\n' +
                     "type: " + message.getType().toString() + '\n' +
-                    "data: " + message.getData()
-            );
+                    "data: " + message.getData();
+            System.out.println(log);
+            log(log);
             ByteBuffer bf = ByteBuffer.allocate(dataBuffer.length + 1);
             bf.put(typeBuffer);
             bf.put(dataBuffer);
             byte[] totalBuffer = bf.array();
 
             if (totalBuffer.length + LENGTH_SIZE < bytesAvailable) {
-                System.out.println("add buffers");
                 buffers.add(totalBuffer);
                 bytesAvailable -= (totalBuffer.length + LENGTH_SIZE);
             }
             else if (buffers.size() == 0) {
-                System.out.println(
-                        "oversized message\n" +
+                String log1 = "oversized message\n" +
                         "length: " + totalBuffer.length + '\n' +
-                        "message: " + message
-                );
+                        "message: " + message;
+                System.out.println(log1);
+                log(log1);
             }
             else {
                 sendBuffer(makeCompoundMessages(buffers), host);
@@ -366,6 +379,7 @@ public class Net {
 
         if (buffers.size() > 0) {
             System.out.println("end, make compound");
+            log("end, make compound");
             sendBuffer(makeCompoundMessages(buffers), host);
         }
     }
@@ -385,11 +399,11 @@ public class Net {
             sendBuffer(makeCompoundMessages(buffers), host);
         } catch (IOException e) {
             e.printStackTrace();
-            System.out.println(
-                    "failed to get updates up to\n" +
+            String log = "failed to get updates up to\n" +
                     "to: " + host + '\n' +
-                    "buffer: " + Arrays.toString(buffer) + '\n'
-            );
+                    "buffer: " + Arrays.toString(buffer) + '\n';
+            System.out.println(log);
+            log(log);
         }
     }
 
@@ -407,38 +421,39 @@ public class Net {
                     case UPDATE -> data = swim.getCodec().encode(message.getData().getUpdateData());
                     default -> {
                         System.out.println("unknown message type, stop encoding");
+                        log("unknown message type, stop encoding");
                         return;
                     }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
-                System.out.println(
-                        "failed to encode data\n" +
+                String log = "failed to encode data\n" +
                         "to: " + host + '\n' +
-                        "data: " + message.getData() + '\n'
-                );
+                        "data: " + message.getData() + '\n';
+                System.out.println(log);
+                log(log);
             }
 
-            System.out.println(
-                    sender + " sending single...\n" +
+            String log = sender + " sending single...\n" +
                     "from: " + localhost.getHostAddress() + ':' + udp.port + '\n' +
                     "to: " + host + '\n' +
                     "type: " + message.getType().toString() + '\n' +
-                    "data: " + message.getData()
-            );
+                    "data: " + message.getData();
+            System.out.println(log);
+            log(log);
             ByteBuffer bf = ByteBuffer.allocate(MESSAGE_TYPE_SIZE + data.length);
             bf.put((byte) message.getType().ordinal());
             bf.put(data);
             piggybackAndSend(bf.array(), host);
         }
         else {
-            System.out.println(
-                    sender + " sending single empty...\n" +
+            String log = sender + " sending single empty...\n" +
                     "from: " + localhost.getHostAddress() + ':' + udp.port + '\n' +
                     "to: " + host + '\n' +
                     "type: " + message.getType().toString() +
-                    "data: " + message.getData()
-            );
+                    "data: " + message.getData();
+            System.out.println(log);
+            log(log);
             ByteBuffer bf = ByteBuffer.allocate(MESSAGE_TYPE_SIZE);
             bf.put((byte) message.getType().ordinal());
             piggybackAndSend(bf.array(), host);
@@ -475,11 +490,11 @@ public class Net {
             udpSocket.send(packet);
         } catch (Exception e) {
             e.printStackTrace();
-            System.out.println(
-                    "failed to send buffer\n" +
+            String log = "failed to send buffer\n" +
                     "to: " + host + '\n' +
-                    "length: " + buffer.length
-            );
+                    "length: " + buffer.length;
+            System.out.println(log);
+            log(log);
         }
     }
 }

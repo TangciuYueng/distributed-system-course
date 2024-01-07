@@ -192,6 +192,7 @@ public class Membership {
 
         all(false, true).forEach(member -> {
             System.out.println("add Update");
+            log("add update");
             UpdateData updateData = new UpdateData(member);
             MessageData messageData2 = MessageData.builder().updateData(updateData).build();
             Message updateMessage = new Message(MessageType.UPDATE, messageData2);
@@ -199,6 +200,7 @@ public class Membership {
         });
 
         System.out.println("SYNC total: " + messages.size());
+        log("SYNC total: " + messages.size());
 
         hosts.forEach(host ->
             swim.getNet().sendMessages("membership", messages, host)
@@ -210,6 +212,7 @@ public class Membership {
         Member member = event.getMember();
 
         System.out.println("received update" + member);
+        log("received update" + member);
 
         switch (member.getState()) {
             case ALIVE -> updateAlive(member);
